@@ -1,0 +1,13 @@
+.venv/
+.pytest_cache/
+logs/
+
+# data
+data/raw_zips/
+data/raw/
+data/processed/images/
+data/processed/labels/
+
+# DVC cache
+.dvc/cache/
+.dvc/tmp/
