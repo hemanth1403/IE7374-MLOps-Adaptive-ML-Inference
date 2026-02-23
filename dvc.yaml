@@ -1,6 +1,8 @@
 stages:
   download_val_and_ann:
     cmd: python scripts/download_coco2017.py --out data/raw_zips --subset val
+    deps:
+      - scripts/download_coco2017.py
     outs:
       - data/raw_zips/val2017.zip
       - data/raw_zips/annotations_trainval2017.zip
@@ -10,13 +12,18 @@ stages:
       python scripts/extract_zips.py --zips data/raw_zips --raw data/raw --subset val &&
       python -c "from pathlib import Path; Path('data/raw/.val_extracted.done').write_text('ok\\n')"
     deps:
+      - scripts/extract_zips.py
       - data/raw_zips/val2017.zip
       - data/raw_zips/annotations_trainval2017.zip
     outs:
       - data/raw/.val_extracted.done
+      - data/raw/val2017
+      - data/raw/annotations
 
   download_train:
     cmd: python scripts/download_coco2017.py --out data/raw_zips --subset train
+    deps:
+      - scripts/download_coco2017.py
     outs:
       - data/raw_zips/train2017.zip
 
@@ -25,17 +32,21 @@ stages:
       python scripts/extract_zips.py --zips data/raw_zips --raw data/raw --subset train &&
       python -c "from pathlib import Path; Path('data/raw/.train_extracted.done').write_text('ok\\n')"
     deps:
+      - scripts/extract_zips.py
       - data/raw_zips/train2017.zip
     outs:
       - data/raw/.train_extracted.done
+      - data/raw/train2017
 
   coco_to_yolo:
     cmd: >
       python scripts/convert_coco_to_yolo.py --raw data/raw --out data/processed &&
-      python scripts/fill_missing_labels.py --processed data/processed
+      python scripts/fill_missing_labels.py --processed data/processed --raw data/raw
     deps:
       - scripts/convert_coco_to_yolo.py
       - scripts/fill_missing_labels.py
+      - data/raw/.train_extracted.done
+      - data/raw/.val_extracted.done
       - data/raw/annotations/instances_train2017.json
       - data/raw/annotations/instances_val2017.json
     outs:
@@ -48,6 +59,8 @@ stages:
       - scripts/preprocess_images.py
       - data/raw/.val_extracted.done
       - data/raw/.train_extracted.done
+      - data/raw/val2017
+      - data/raw/train2017
     outs:
       - data/processed/images
 
@@ -56,6 +69,7 @@ stages:
     deps:
       - scripts/create_splits.py
       - data/processed/images
+      - data/processed/labels
     outs:
       - data/splits
 

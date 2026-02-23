@@ -2,6 +2,11 @@ schema: '2.0'
 stages:
   download_val_and_ann:
     cmd: python scripts/download_coco2017.py --out data/raw_zips --subset val
+    deps:
+    - path: scripts/download_coco2017.py
+      hash: md5
+      md5: 90172354df68bce635dec110ccc85ae6
+      size: 2947
     outs:
     - path: data/raw_zips/annotations_trainval2017.zip
       hash: md5
@@ -24,13 +29,32 @@ stages:
       hash: md5
       md5: 442b8da7639aecaf257c1dceb8ba8c80
       size: 815585330
+    - path: scripts/extract_zips.py
+      hash: md5
+      md5: a315f77a9b38c7aa52e06235e9ea8b09
+      size: 1089
     outs:
     - path: data/raw/.val_extracted.done
       hash: md5
       md5: e02f288d5ef7b53b6112665d1bbc29d8
       size: 4
+    - path: data/raw/annotations
+      hash: md5
+      md5: 1b4ce3d407ac70dc7f3a4c0933f77469.dir
+      size: 834416290
+      nfiles: 6
+    - path: data/raw/val2017
+      hash: md5
+      md5: a0173f60761f977a5afe88aa2d75acb6.dir
+      size: 814705164
+      nfiles: 5000
   download_train:
     cmd: python scripts/download_coco2017.py --out data/raw_zips --subset train
+    deps:
+    - path: scripts/download_coco2017.py
+      hash: md5
+      md5: 90172354df68bce635dec110ccc85ae6
+      size: 2947
     outs:
     - path: data/raw_zips/train2017.zip
       hash: md5
@@ -45,15 +69,32 @@ stages:
       hash: md5
       md5: cced6f7f71b7629ddf16f17bbcfab6b2
       size: 19336861798
+    - path: scripts/extract_zips.py
+      hash: md5
+      md5: a315f77a9b38c7aa52e06235e9ea8b09
+      size: 1089
     outs:
     - path: data/raw/.train_extracted.done
       hash: md5
       md5: e02f288d5ef7b53b6112665d1bbc29d8
       size: 4
+    - path: data/raw/train2017
+      hash: md5
+      md5: 107409cf0f5a123bade82b25cbfa38b8.dir
+      size: 19314466396
+      nfiles: 118287
   coco_to_yolo:
     cmd: "python scripts/convert_coco_to_yolo.py --raw data/raw --out data/processed
-      && python scripts/fill_missing_labels.py --processed data/processed\n"
+      && python scripts/fill_missing_labels.py --processed data/processed --raw data/raw\n"
     deps:
+    - path: data/raw/.train_extracted.done
+      hash: md5
+      md5: e02f288d5ef7b53b6112665d1bbc29d8
+      size: 4
+    - path: data/raw/.val_extracted.done
+      hash: md5
+      md5: e02f288d5ef7b53b6112665d1bbc29d8
+      size: 4
     - path: data/raw/annotations/instances_train2017.json
       hash: md5
       md5: 20542493efc7df5d9340522b7c87b06c
@@ -68,8 +109,8 @@ stages:
       size: 2604
     - path: scripts/fill_missing_labels.py
       hash: md5
-      md5: 4adbb8ac61eaf56f09b4fe579abf5015
-      size: 1161
+      md5: be2997651c9ebf77c3c00375e6786b89
+      size: 2405
     outs:
     - path: data/processed/coco.names
       hash: md5
@@ -77,9 +118,9 @@ stages:
       size: 699
     - path: data/processed/labels
       hash: md5
-      md5: cb54b3e0e4619c9ea3cc5f50628b2209.dir
+      md5: 947674f4df70e10bae6a98e16fa6b692.dir
       size: 35070252
-      nfiles: 122218
+      nfiles: 123287
   preprocess_images_link:
     cmd: python scripts/preprocess_images.py --raw data/raw --processed 
       data/processed --mode link
@@ -92,6 +133,16 @@ stages:
       hash: md5
       md5: e02f288d5ef7b53b6112665d1bbc29d8
       size: 4
+    - path: data/raw/train2017
+      hash: md5
+      md5: 107409cf0f5a123bade82b25cbfa38b8.dir
+      size: 19314466396
+      nfiles: 118287
+    - path: data/raw/val2017
+      hash: md5
+      md5: a0173f60761f977a5afe88aa2d75acb6.dir
+      size: 814705164
+      nfiles: 5000
     - path: scripts/preprocess_images.py
       hash: md5
       md5: 16d9dbb3fa4197ccfeb3a12cea2051b3
@@ -99,18 +150,23 @@ stages:
     outs:
     - path: data/processed/images
       hash: md5
-      md5: c30e73008192b8c6c17f6c9119ec0e50.dir
-      size: 814705164
-      nfiles: 5000
+      md5: 72d1c2489daeb8507d42936e43126c08.dir
+      size: 20129171560
+      nfiles: 123287
   splits:
     cmd: python scripts/create_splits.py --processed data/processed --out 
       data/splits --test-frac 0.10
     deps:
     - path: data/processed/images
       hash: md5
-      md5: c30e73008192b8c6c17f6c9119ec0e50.dir
-      size: 814705164
-      nfiles: 5000
+      md5: 72d1c2489daeb8507d42936e43126c08.dir
+      size: 20129171560
+      nfiles: 123287
+    - path: data/processed/labels
+      hash: md5
+      md5: 947674f4df70e10bae6a98e16fa6b692.dir
+      size: 35070252
+      nfiles: 123287
     - path: scripts/create_splits.py
       hash: md5
       md5: 5dbc170d2e919ce526f7bc6247ca346f
@@ -118,8 +174,8 @@ stages:
     outs:
     - path: data/splits
       hash: md5
-      md5: dde80328b3030a15b0bccc30fbd1b0e2.dir
-      size: 240004
+      md5: b9c88eb00c4549fb4bbabd5da5823a6d.dir
+      size: 6154350
       nfiles: 3
   reports:
     cmd: "python scripts/schema_stats.py --processed data/processed --splits data/splits
@@ -130,13 +186,13 @@ stages:
     deps:
     - path: data/processed
       hash: md5
-      md5: f00f2e54344fb480a291330568c1f0a6.dir
-      size: 849776115
-      nfiles: 127219
+      md5: f2c8e1010b6192d9f1f1c35679959153.dir
+      size: 20164242511
+      nfiles: 246575
     - path: data/splits
       hash: md5
-      md5: dde80328b3030a15b0bccc30fbd1b0e2.dir
-      size: 240004
+      md5: b9c88eb00c4549fb4bbabd5da5823a6d.dir
+      size: 6154350
       nfiles: 3
     - path: scripts/anomaly_alerts.py
       hash: md5
@@ -157,6 +213,6 @@ stages:
     outs:
     - path: data/reports
       hash: md5
-      md5: 156408d7ef21910f6d450673563d1c40.dir
-      size: 2953
+      md5: b77ba5604e95c939e24e8e69c8787464.dir
+      size: 3058
       nfiles: 4
