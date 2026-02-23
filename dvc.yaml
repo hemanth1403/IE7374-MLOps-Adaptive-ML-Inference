@@ -1,0 +1,76 @@
+stages:
+  download_val_and_ann:
+    cmd: python scripts/download_coco2017.py --out data/raw_zips --subset val
+    outs:
+      - data/raw_zips/val2017.zip
+      - data/raw_zips/annotations_trainval2017.zip
+
+  extract_val_and_ann:
+    cmd: >
+      python scripts/extract_zips.py --zips data/raw_zips --raw data/raw --subset val &&
+      python -c "from pathlib import Path; Path('data/raw/.val_extracted.done').write_text('ok\\n')"
+    deps:
+      - data/raw_zips/val2017.zip
+      - data/raw_zips/annotations_trainval2017.zip
+    outs:
+      - data/raw/.val_extracted.done
+
+  download_train:
+    cmd: python scripts/download_coco2017.py --out data/raw_zips --subset train
+    outs:
+      - data/raw_zips/train2017.zip
+
+  extract_train:
+    cmd: >
+      python scripts/extract_zips.py --zips data/raw_zips --raw data/raw --subset train &&
+      python -c "from pathlib import Path; Path('data/raw/.train_extracted.done').write_text('ok\\n')"
+    deps:
+      - data/raw_zips/train2017.zip
+    outs:
+      - data/raw/.train_extracted.done
+
+  coco_to_yolo:
+    cmd: >
+      python scripts/convert_coco_to_yolo.py --raw data/raw --out data/processed &&
+      python scripts/fill_missing_labels.py --processed data/processed
+    deps:
+      - scripts/convert_coco_to_yolo.py
+      - scripts/fill_missing_labels.py
+      - data/raw/annotations/instances_train2017.json
+      - data/raw/annotations/instances_val2017.json
+    outs:
+      - data/processed/labels
+      - data/processed/coco.names
+
+  preprocess_images_link:
+    cmd: python scripts/preprocess_images.py --raw data/raw --processed data/processed --mode link
+    deps:
+      - scripts/preprocess_images.py
+      - data/raw/.val_extracted.done
+      - data/raw/.train_extracted.done
+    outs:
+      - data/processed/images
+
+  splits:
+    cmd: python scripts/create_splits.py --processed data/processed --out data/splits --test-frac 0.10
+    deps:
+      - scripts/create_splits.py
+      - data/processed/images
+    outs:
+      - data/splits
+
+  reports:
+    cmd: >
+      python scripts/schema_stats.py --processed data/processed --splits data/splits --out data/reports &&
+      python scripts/quality_checks.py --processed data/processed --splits data/splits --out data/reports/quality.json &&
+      python scripts/anomaly_alerts.py --quality data/reports/quality.json &&
+      python scripts/bias_slicing.py --processed data/processed --splits data/splits --out data/reports/bias.md
+    deps:
+      - scripts/schema_stats.py
+      - scripts/quality_checks.py
+      - scripts/anomaly_alerts.py
+      - scripts/bias_slicing.py
+      - data/processed
+      - data/splits
+    outs:
+      - data/reports
