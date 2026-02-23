@@ -3,6 +3,7 @@
 logs/
 
 # data
+data/
 data/raw_zips/
 data/raw/
 data/processed/images/
