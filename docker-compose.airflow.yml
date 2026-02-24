@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   postgres:
     image: postgres:13
@@ -24,10 +22,11 @@ services:
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
       AIRFLOW__CORE__FERNET_KEY: ""
       AIRFLOW__WEBSERVER__SECRET_KEY: "dev-secret-key"
+      PIPELINE_REPO_DIR: /opt/airflow/repo/Data-Pipeline
     volumes:
       - ./:/opt/airflow/repo
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
+      - ./Data-Pipeline/dags:/opt/airflow/dags
+      - ./Data-Pipeline/logs:/opt/airflow/logs
     command: >
       bash -lc "airflow db migrate &&
                 airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"
@@ -45,12 +44,11 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
-      # Point DAG to your repo
-      PIPELINE_REPO_DIR: /opt/airflow/repo
+      PIPELINE_REPO_DIR: /opt/airflow/repo/Data-Pipeline
     volumes:
       - ./:/opt/airflow/repo
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
+      - ./Data-Pipeline/dags:/opt/airflow/dags
+      - ./Data-Pipeline/logs:/opt/airflow/logs
     ports:
       - "8080:8080"
     command: bash -lc "airflow webserver"
@@ -67,11 +65,11 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      PIPELINE_REPO_DIR: /opt/airflow/repo
+      PIPELINE_REPO_DIR: /opt/airflow/repo/Data-Pipeline
     volumes:
       - ./:/opt/airflow/repo
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
+      - ./Data-Pipeline/dags:/opt/airflow/dags
+      - ./Data-Pipeline/logs:/opt/airflow/logs
     command: bash -lc "airflow scheduler"
     restart: unless-stopped
 

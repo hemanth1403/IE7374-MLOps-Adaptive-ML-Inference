@@ -2,14 +2,12 @@
 .pytest_cache/
 logs/
 
-# data
-data/
-data/raw_zips/
-data/raw/
-data/processed/images/
-data/processed/labels/
-data/splits/
-data/reports/
+# pipeline data (now under Data-Pipeline/)
+Data-Pipeline/data/
+Data-Pipeline/.dvc/cache/
+Data-Pipeline/.dvc/tmp/
+Data-Pipeline/.pytest_cache/
+Data-Pipeline/logs/
 
 # DVC cache
 .dvc/cache/

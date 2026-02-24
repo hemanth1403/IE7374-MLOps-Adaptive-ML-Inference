@@ -9,7 +9,7 @@ USER airflow
 
 # Install python deps for pipeline (DVC + scripts)
 # requirements.txt is in the repo root (mounted in compose)
-COPY requirements.txt /tmp/requirements.txt
+COPY Data-Pipeline/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 # PyYAML used by CI smoke tests

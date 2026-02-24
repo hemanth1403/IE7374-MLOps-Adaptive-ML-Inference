@@ -7,7 +7,7 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 
 
-REPO_DIR = os.environ.get("PIPELINE_REPO_DIR", "/opt/airflow/repo")
+REPO_DIR = os.environ.get("PIPELINE_REPO_DIR", "/opt/airflow/repo/Data-Pipeline")
 
 DEFAULT_ARGS = {
     "owner": "mlops",
@@ -28,27 +28,21 @@ with DAG(
     max_active_tasks=1,
 ) as dag:
 
-    # Helper: run inside repo dir
     def dvc_stage(stage_name: str) -> BashOperator:
         return BashOperator(
             task_id=f"dvc_{stage_name}",
-            bash_command=f"cd {REPO_DIR} && dvc repro {stage_name}",
+            bash_command=f"cd '{REPO_DIR}' && dvc repro {stage_name}",
         )
 
     download_val_and_ann = dvc_stage("download_val_and_ann")
     extract_val_and_ann = dvc_stage("extract_val_and_ann")
-
     download_train = dvc_stage("download_train")
     extract_train = dvc_stage("extract_train")
-
     coco_to_yolo = dvc_stage("coco_to_yolo")
     preprocess_images_link = dvc_stage("preprocess_images_link")
     splits = dvc_stage("splits")
     reports = dvc_stage("reports")
 
-    # Dependencies
-    download_val_and_ann >> extract_val_and_ann
-    download_train >> extract_train
-
-    [extract_val_and_ann, extract_train] >> coco_to_yolo
-    coco_to_yolo >> preprocess_images_link >> splits >> reports
+    # Sequential to avoid DVC lock contention
+    download_val_and_ann >> extract_val_and_ann >> download_train >> extract_train
+    extract_train >> coco_to_yolo >> preprocess_images_link >> splits >> reports
