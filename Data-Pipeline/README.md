@@ -1,6 +1,6 @@
 # Data Pipeline - ML Orchestration Platform
 
-## COCO 2017 Data Pipeline with Airflow & DVC
+## COCO 2017 Data Pipeline
 
 **Course:** IE7374 - MLOps, Spring 2026  
 **Team:** Hemanth Sai Madadapu, Sujith Peddireddy, Jan Mollet, Sayee Ashish Aher, Sowmyashree Jayaram
@@ -9,51 +9,78 @@
 
 ## Overview
 
-Production level data pipeline for processing COCO 2017 dataset, orchestrated via **Apache Airflow** and **DVC**, deployed in **Docker containers**. Prepares data for our RL-powered multi-model ML orchestration system.
+Reproducible MLOps-style data pipeline for processing COCO 2017 dataset, orchestrated via Apache Airflow and DVC, deployed in Docker containers. Prepares data for our RL-powered multi-model orchestration system.
 
 ### What This Pipeline Does
 
-1. Downloads 118K+ COCO images automatically
-2. Converts to YOLO format for object detection
-3. Creates stratified train/val/test splits
-4. Validates data quality with automated checks
-5. Detects and mitigates bias across scene complexity
-6. Orchestrates via Airflow DAG (8 stages)
-7. Versions data with DVC
-8. Deployed in Docker (production-ready)
+Downloads 118K+ COCO images automatically  
+ Converts to YOLO format for object detection  
+ Creates stratified train/val/test splits  
+ Validates data quality with automated checks  
+ Detects and mitigates bias across scene complexity  
+ Orchestrates via Airflow DAG (8 stages)  
+ Versions data with DVC  
+ Deployed in Docker containers
+
+### Resource Requirements
+
+** Important:** Before running, ensure you have:
+
+- **Disk Space:** 20GB minimum
+- **First Run Time:** 2-4 hours (mostly download + extraction)
+- **Subsequent Runs:** <5 minutes (DVC caching)
+- **Network:** Stable connection for 19GB download
 
 ---
 
-## 🐳 Quick Start with Docker
+## Quick Start with Docker
 
-**Why Docker?** Solves all dependency conflicts, production-ready, works immediately.
+** All commands must be run from repository root, not Data-Pipeline/**
 
 ```bash
 # 1. Clone repository
 git clone https://github.com/hemanth1403/IE7374-MLOps-Adaptive-ML-Inference.git
 cd IE7374-MLOps-Adaptive-ML-Inference
 
-# 2. Start Airflow with Docker Compose (includes PostgreSQL + scheduler + webserver)
+# 2. Start Airflow with Docker Compose
 docker-compose -f docker-compose.airflow.yml up -d
 
 # 3. Access Airflow UI
 open http://localhost:8080
 
 # 4. Login
-Username: airflow
-Password: airflow
+Username: admin
+Password: admin
 
 # 5. Trigger Pipeline
 - Find DAG: "dvc_coco_pipeline"
 - Toggle ON (switch on left)
-- Click play button
-- Watch 8 stages execute!
+- Click ▶ play button
+- Watch 8 stages execute
 
 # 6. Stop when done
 docker-compose -f docker-compose.airflow.yml down
 ```
 
-**That's it! No Python setup, no venv, no dependency hell.**
+### Alternative: DVC Direct Execution
+
+**For development or if Docker unavailable:**
+
+```bash
+# Navigate to Data-Pipeline (important!)
+cd Data-Pipeline
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run pipeline
+dvc repro
+
+# Run tests
+pytest tests/ -v
+```
+
+**Note:** All DVC and pytest commands must be run from the `Data-Pipeline/` directory.
 
 ---
 
@@ -61,300 +88,114 @@ docker-compose -f docker-compose.airflow.yml down
 
 ### 8-Stage DVC Pipeline
 
-**Orchestrated by Airflow, defined in dvc.yaml:**
+**Defined in Data-Pipeline/dvc.yaml:**
 
-**Stage 1: download_val_and_ann**
+**Stage 1: download_val_and_ann** - Downloads validation set + annotations (~1GB)
 
-- Downloads validation images + annotations (~1GB)
+**Stage 2: extract_val_and_ann** - Extracts 5,000 validation images
 
-**Stage 2: extract_val_and_ann**
+**Stage 3: download_train** - Downloads training set (~18GB, takes 30-60 min)
 
-- Extracts 5,000 validation images
+**Stage 4: extract_train** - Extracts 118,287 training images
 
-**Stage 3: download_train**
+**Stage 5: coco_to_yolo** - Converts COCO JSON to YOLO format + fills missing labels
 
-- Downloads training images (~18GB)
+**Stage 6: preprocess_images_link** - Creates symlinks (disk-efficient, no data duplication)
 
-**Stage 4: extract_train**
+**Stage 7: splits** - Creates stratified train/val/test (10% test, maintains complexity balance)
 
-- Extracts 118,287 training images
-
-**Stage 5: coco_to_yolo**
-
-- Converts COCO format to YOLO format
-- Fills missing label files
-
-**Stage 6: preprocess_images_link**
-
-- Creates symlinks (disk-efficient, no data duplication)
-
-**Stage 7: splits**
-
-- Creates stratified train/val/test (10% test, maintains complexity balance)
-
-**Stage 8: reports**
-
-- Generates schema validation, quality checks, anomaly detection, bias analysis
+**Stage 8: reports** - Generates schema, quality, anomaly, and bias reports
 
 **Visualizations:**
 
-- Airflow Graph: `docs/airflow_graph_success.png`
-- Gantt Chart: `docs/airflow_gantt_success.png`
-- DVC DAG: `docs/dvcDAG.png`
+- Airflow Graph: docs/airflow_graph_success.png
+- Gantt Chart: docs/airflow_gantt_success.png (shows reports stage takes longest)
+- DVC DAG: docs/dvcDAG.png
 
-### Airflow DAG Design
+### Airflow DAG Integration
 
-**File:** `dags/dvc_coco_pipeline.py`
+**File:** Data-Pipeline/dags/dvc_coco_pipeline.py
 
-**Smart Integration:** Each Airflow task runs `dvc repro <stage>`, combining:
+Each Airflow task executes `dvc repro <stage>`, combining:
 
 - Airflow's orchestration + monitoring
 - DVC's caching + reproducibility
 
-**Key Features:**
+**Key Configuration:**
 
-- Sequential execution (avoids DVC lock conflicts)
-- 3 retries per task (5-minute delays)
+- Sequential execution (max_active_tasks=1) to avoid DVC lock conflicts
+- 3 retries per task with 5-minute delays
 - Proper dependency management
-- Clean separation of concerns
 
----
-
-## All 12 Requirements Met
-
-**1. Proper Documentation**
-
-- README (this file), inline comments, docstrings
-- Evidence: Comprehensive documentation throughout
-
-**2. Modular Code**
-
-- 10 independent scripts in scripts/
-- Evidence: Each script is self-contained and reusable
-
-**3. Airflow DAG Orchestration**
-
-- dags/dvc_coco_pipeline.py with 8 tasks
-- Evidence: Screenshots in docs/ showing successful execution
-
-**4. Tracking & Logging**
-
-- Python logging in all scripts
-- Evidence: Check any script for logging.info() statements
-
-**5. DVC Data Versioning**
-
-- dvc.yaml defines pipeline, dvc.lock tracks hashes
-- Evidence: Local DVC tracking with hash-based versioning
-
-**6. Pipeline Optimization**
-
-- Airflow Gantt chart identifies bottlenecks
-- Evidence: docs/airflow_gantt_success.png shows execution timeline
-
-**7. Schema Generation**
-
-- scripts/schema_stats.py generates data schema
-- Evidence: data/reports/schema_stats.yaml output
-
-**8. Anomaly Detection & Alerts**
-
-- scripts/anomaly_alerts.py with automated alerts
-- Evidence: Console warnings + detailed logging
-
-**9. Bias Detection & Mitigation**
-
-- scripts/bias_slicing.py + stratified splitting
-- Evidence: data/reports/bias.md + balanced splits
-
-**10. Test Modules**
-
-- 5 pytest files in tests/
-- Evidence: Comprehensive test suite with CI/CD
-
-**11. Reproducibility**
-
-- Docker + DVC + requirements.txt + docs
-- Evidence: Anyone can run docker-compose and get same results
-
-**12. Error Handling**
-
-- Try-catch blocks, 3 retries in Airflow DAG
-- Evidence: Graceful failure handling throughout
+**Bottleneck Analysis:** Gantt chart (docs/airflow_gantt_success.png) shows reports stage (quality checks + bias slicing) takes the longest. Subsequent runs are cached by DVC, reducing re-run time significantly.
 
 ---
 
 ## Running the Pipeline
 
-### Method 1: Docker + Airflow
+### Method 1: Docker + Airflow (Recommended)
 
-**Complete setup in 2 minutes:**
+**From repository root:**
 
 ```bash
-# From repository root
+# Start Airflow stack
 docker-compose -f docker-compose.airflow.yml up -d
 
-# Access Airflow UI
+# Access UI
 open http://localhost:8080
-# Login: airflow / airflow
-# Trigger DAG: dvc_coco_pipeline
+
+# Login
+Username: admin
+Password: admin
+
+# Trigger DAG "dvc_coco_pipeline"
+# Monitor execution in Graph View
 ```
 
-**Features:**
+**Why Docker:**
 
-- Isolated environment (no conflicts)
-- PostgreSQL backend (better than SQLite)
-- Production-ready deployment
-- Easy team collaboration
+- No dependency conflicts
+- PostgreSQL backend included
+- Identical environment across machines
+- Airflow logs available in UI
 
-**Monitor execution:**
-
-- Graph View: See task dependencies
-- Gantt View: Identify bottlenecks
-- Logs: Click any task box
-
-**Cleanup:**
+**Shutdown:**
 
 ```bash
 docker-compose -f docker-compose.airflow.yml down
 ```
 
-### Method 2: DVC Direct Execution (Development)
+### Method 2: DVC Direct Execution
 
-**For code development and testing:**
+**From Data-Pipeline/ directory:**
 
 ```bash
 cd Data-Pipeline
 
-# Install dependencies (first time)
+# Install dependencies
 pip install -r requirements.txt
 
-# Run pipeline
+# Run complete pipeline
 dvc repro
 
-# Run specific stage
-dvc repro reports
+# View pipeline structure
+dvc dag
+
+# Check status
+dvc status
 ```
 
-**When to use:**
+**DVC Features:**
 
-- Developing new scripts
-- Testing changes locally
-- Quick iterations
-- No need for Airflow overhead
-
-### Method 3: Standalone Airflow (Backup)
-
-**If Docker unavailable:**
-
-```bash
-cd Data-Pipeline
-export AIRFLOW_HOME=$(pwd)/airflow
-
-# One-time setup
-pip install apache-airflow==2.11.0
-airflow db init
-airflow users create --username admin --password admin \
-    --firstname Admin --lastname User --role Admin \
-    --email admin@example.com
-
-# Run
-airflow standalone
-# Access http://localhost:8080
-```
-
----
-
-## 🐳 Docker Deployment Details
-
-### What's in docker-compose.airflow.yml
-
-**Services:**
-
-**airflow-webserver**
-
-- Web UI for pipeline monitoring
-- Port 8080
-- Includes all Airflow providers
-
-**airflow-scheduler**
-
-- Executes DAG tasks
-- Monitors dependencies
-- Handles retries
-
-**postgres**
-
-- Metadata database for Airflow
-- Better performance than SQLite
-- Production-recommended
-
-**Volume Mounts:**
-
-- `./Data-Pipeline/dags` -> Airflow DAGs folder
-- `./Data-Pipeline/scripts` -> Pipeline scripts
-- `./Data-Pipeline/data` -> Data directory
-
-### Docker Advantages
-
-**Why we use Docker:**
-
-**1. Dependency Isolation**
-
-- Airflow in container, ML libraries in container
-- No Python version conflicts
-- No package dependency hell
-
-**2. Reproducibility**
-
-- Same environment on Mac/Linux/Windows
-- Team members get identical setup
-- Graders can run with one command
-
-**3. Production Alignment**
-
-- Industry standard for deployment
-- Matches how Airflow runs in production
-- Demonstrates MLOps best practices
-
-**4. Easy Cleanup**
-
-- `docker-compose down` removes everything
-- No leftover files or processes
-- Fresh start anytime
+- Automatic caching (skips completed stages)
+- Only reruns changed dependencies
+- Faster than full re-execution
 
 ---
 
 ## Testing
 
-### Test Suite (5 Modules)
-
-**test_ci_smoke.py** - CI sanity checks
-
-- Verifies basic imports
-- Environment validation
-
-**test_dvc_yaml_valid.py** - DVC configuration
-
-- Validates dvc.yaml syntax
-- Checks stage definitions
-
-**test_quality_invariants.py** - Data quality
-
-- Image format validation
-- Label correctness checks
-
-**test_splits_integrity.py** - Critical data leakage test
-
-- Validates train/val/test are disjoint
-- No overlap between splits
-
-**test_reports_exist_and_parse.py** - Output validation
-
-- Reports generated successfully
-- JSON/YAML files parseable
-
-### Running Tests
+** Run tests from Data-Pipeline/ directory:**
 
 ```bash
 cd Data-Pipeline
@@ -364,41 +205,52 @@ pytest tests/ -v
 
 # With coverage
 pytest tests/ --cov=scripts --cov-report=html
+
+# View coverage
 open htmlcov/index.html
 
 # Specific test
 pytest tests/test_splits_integrity.py -v
 ```
 
-### CI/CD Integration
+### Test Modules (5 files)
 
-**GitHub Actions** (.github/workflows/ci.yml)
+**test_ci_smoke.py** - CI sanity checks (imports, environment)
+
+**test_dvc_yaml_valid.py** - DVC config validation (YAML syntax, stages)
+
+**test_quality_invariants.py** - Data quality (image formats, labels)
+
+**test_splits_integrity.py** - Critical: No data leakage between train/val/test
+
+**test_reports_exist_and_parse.py** - Output validation (reports generated, parseable)
+
+### CI/CD
+
+**GitHub Actions** (.github/workflows/ci.yml):
 
 - Runs on every push
 - Automated testing
-- Coverage reporting
+- Code quality checks
 
 ---
 
 ## Data Versioning with DVC
 
-### DVC Setup (Local)
+** Run DVC commands from Data-Pipeline/ directory:**
 
-**Configuration:** Local DVC (no cloud remote for this checkpoint)
+### Configuration
 
-**.dvc/config:**
-
-```ini
-[core]
-    no_scm = True
-```
-
-**Pipeline:** dvc.yaml defines 8 stages  
-**Lock:** dvc.lock tracks output hashes for reproducibility
+**Mode:** Local DVC (no cloud remote)  
+**Config:** Data-Pipeline/.dvc/config  
+**Pipeline:** Data-Pipeline/dvc.yaml (8 stages)  
+**Lock:** Data-Pipeline/dvc.lock (tracks output hashes)
 
 ### DVC Commands
 
 ```bash
+cd Data-Pipeline
+
 # Run pipeline
 dvc repro
 
@@ -408,160 +260,355 @@ dvc status
 # View DAG
 dvc dag
 
-# Force re-run
-dvc repro -f <stage_name>
+# Force re-run specific stage
+dvc repro -f reports
 ```
-
-### Why DVC?
-
-- **Caching:** Skips unchanged stages (saves hours on re-runs)
-- **Versioning:** Tracks data via hashes, not Git
-- **Reproducibility:** dvc repro gives same results
-- **Lineage:** Complete data provenance
-
-**Future:** Can add cloud remote (GCS) for team data sharing
 
 ---
 
-## Quality Assurance
+## Quality Assurance & Bias Analysis
 
-### Schema Validation (scripts/schema_stats.py)
+### Schema Validation
+
+**Script:** Data-Pipeline/scripts/schema_stats.py
+
+**Outputs:**
+
+- data/reports/schema.json - Expected schema definition
+- data/reports/stats.json - Dataset statistics
 
 **Validates:**
 
-- Image dimensions correct
-- File formats valid (JPEG)
-- Color channels correct (RGB, 3 channels)
-- Annotation completeness
+- Image formats (JPEG)
+- Label formats (YOLO)
+- Directory structure
+- File counts
 
-**Output:** data/reports/schema_stats.yaml
+### Quality Checks
 
-### Quality Checks (scripts/quality_checks.py)
-
-**Checks:**
-
-- All images readable
-- Labels exist for all images
-- Bounding boxes in range [0, 1]
-- Valid YOLO format
-- Class IDs valid [0-79]
+**Script:** Data-Pipeline/scripts/quality_checks.py
 
 **Output:** data/reports/quality.json
 
-### Anomaly Detection (scripts/anomaly_alerts.py)
+**Example results (from your actual run):**
 
-**Detects:**
+```json
+{
+  "total_images": { "train": 106411, "val": 5000, "test": 11876 },
+  "missing_label_files": { "train": 0, "val": 0, "test": 0 },
+  "empty_label_files": { "train": 932, "val": 48, "test": 89 },
+  "invalid_yolo_lines": 0,
+  "invalid_bbox_range": 0,
+  "objects_per_image_stats": {
+    "train": { "mean": 7.18, "max": 90 },
+    "val": { "mean": 7.27, "max": 62 }
+  }
+}
+```
 
-- Corrupt files
-- Missing labels
-- Invalid bounding boxes
-- Format violations
+**Validates:**
 
-**Alerts:** Console warnings + detailed logs
+- All images have corresponding labels
+- No invalid YOLO format lines
+- Bounding boxes within valid range [0, 1]
+- Class IDs in range [0-79]
 
-### Bias Detection & Mitigation (scripts/bias_slicing.py)
+### Anomaly Detection
 
-**Detection:**
+**Script:** Data-Pipeline/scripts/anomaly_alerts.py
 
-- Slices data by scene complexity:
-  - Simple: ≤2 objects
-  - Moderate: 3-7 objects
-  - Complex: ≥8 objects
-- Analyzes distribution across train/val/test
+**What it does:**
 
-**Mitigation (Implemented via Stratified Splitting):**
+- Analyzes quality.json results
+- Flags suspicious patterns (>1% missing labels, invalid formats)
+- Emits alerts to Airflow task logs (searchable with "ALERT:")
+- Optional extension: Airflow email/Slack notification hooks can be configured
 
-**Primary Strategy:** scripts/create_splits.py
+**How alerts work:**
 
-- Maintains 35% simple / 45% moderate / 20% complex distribution
-- Prevents over-representation of any scene type
-- Proactive bias prevention (better than reactive fixing)
+- Logged to console and Airflow UI
+- Critical issues fail the task
+- Warnings logged for review
 
-**Findings:** Distribution balanced, no re-sampling needed
+### Bias Detection & Mitigation
 
-**Future Mitigations (if bias detected):**
+**Detection Script:** Data-Pipeline/scripts/bias_slicing.py
 
-- Re-sampling underrepresented groups
-- Weighted loss functions in training
-- Class-aware data augmentation
-- Separate evaluation per slice
+**Slicing Strategy:**
+
+We slice data by scene complexity based on object count:
+
+- Simple: ≤2 objects
+- Moderate: 3-7 objects
+- Complex: ≥8 objects
 
 **Output:** data/reports/bias.md
+
+**Example results (from your actual run):**
+
+```
+Train:
+- simple: 32,649 (30.68%)
+- moderate: 38,612 (36.29%)
+- complex: 35,150 (33.03%)
+
+Val:
+- simple: 1,566 (31.32%)
+- moderate: 1,736 (34.72%)
+- complex: 1,698 (33.96%)
+
+Test:
+- simple: 3,656 (30.78%)
+- moderate: 4,282 (36.06%)
+- complex: 3,938 (33.16%)
+```
+
+**Analysis:** Distribution is balanced across all splits (approximately 31%/36%/33% across train/val/test).
+
+**Mitigation Implementation:**
+
+**Primary Mitigation Strategy: Stratified Splitting**
+
+Our `create_splits.py` script implements bias mitigation through:
+
+1. **Stratified Sampling**
+   - Analyzes scene complexity distribution in source data
+   - Creates splits that maintain similar distributions across train/val/test
+   - Prevents over-representation of any complexity tier
+
+2. **Validation of Balance**
+   - Bias report (bias.md) confirms balanced distribution
+   - No single split is skewed toward simple or complex scenes
+   - Ensures model will train on representative samples
+
+**This is proactive mitigation** - we prevent bias during split creation rather than detecting and fixing it afterward.
+
+**If Bias Detected (deviation >5% from balanced):**
+
+Reactive mitigation strategies available:
+
+- **Re-sampling:** Oversample underrepresented complexity tiers
+- **Weighted Sampling:** Adjust sampling probability by inverse frequency
+- **Threshold Tuning:** Adjust complexity classification thresholds
+- **Document Trade-offs:** Balance between sample size and fairness
+
+**Current Status:** Analysis shows balanced distribution across splits. Stratified approach successfully prevents complexity bias. No additional re-sampling needed.
+
+**Future Training Mitigations:**
+
+- Weighted loss functions (address class imbalance: person 29%, rare classes <1%)
+- Focal loss (focus on hard examples)
+- Class-aware data augmentation
 
 ---
 
 ## Reproducibility
 
-### Run on Any Machine
+### Setup on Any Machine
+
+**Complete reproduction from scratch:**
 
 ```bash
-# 1. Clone
+# 1. Clone repository
 git clone https://github.com/hemanth1403/IE7374-MLOps-Adaptive-ML-Inference.git
 cd IE7374-MLOps-Adaptive-ML-Inference
 
-# 2. Run with Docker (RECOMMENDED)
+# 2. Run with Docker (no Python setup needed)
 docker-compose -f docker-compose.airflow.yml up -d
-# Access http://localhost:8080, trigger DAG
 
-# OR run with DVC locally
-cd Data-Pipeline
-pip install -r requirements.txt
-dvc repro
+# 3. Access Airflow UI
+open http://localhost:8080
+# Login: admin / admin
+# Trigger DAG: dvc_coco_pipeline
+
+# Monitor execution in UI (Graph View or Gantt View)
 ```
 
-**Runtime:** 2-4 hours first run, under 5 minutes with DVC cache
+**OR run with DVC directly:**
 
-**Outputs:** 123K processed images, YOLO labels, stratified splits, quality reports
+```bash
+# Navigate to Data-Pipeline directory
+cd Data-Pipeline
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run pipeline
+dvc repro
+
+# Verify
+pytest tests/ -v
+```
+
+**Expected Runtime:**
+
+- First run: 2-4 hours (download 19GB + processing)
+- Subsequent runs: <5 minutes (DVC caches completed stages)
+
+**Expected Outputs:**
+
+```
+Data-Pipeline/data/
+├── raw_zips/           # Downloaded COCO archives
+├── raw/                # Extracted images and annotations
+│   ├── train2017/      # 118,287 images
+│   ├── val2017/        # 5,000 images
+│   └── annotations/    # COCO JSON files
+├── processed/
+│   ├── images/         # Symlinks to raw images (disk-efficient)
+│   ├── labels/         # YOLO format annotations
+│   └── coco.names      # Class names (80 classes)
+├── splits/
+│   ├── train.txt       # 106,411 image paths
+│   ├── val.txt         # 5,000 image paths
+│   └── test.txt        # 11,876 image paths
+└── reports/
+    ├── schema.json     # Schema definition
+    ├── stats.json      # Dataset statistics
+    ├── quality.json    # Quality validation results
+    └── bias.md         # Bias analysis report
+```
 
 ---
 
-## Scripts & Components
+## Components
 
-**10 Modular Scripts:**
+### Pipeline Scripts (10 modules)
 
-1. download_coco2017.py - Download with resume support
-2. extract_zips.py - Extract archives
-3. convert_coco_to_yolo.py - Format conversion
-4. fill_missing_labels.py - Label completion
-5. preprocess_images.py - Symlink creation (disk-efficient)
-6. create_splits.py - Stratified splitting
-7. schema_stats.py - Schema generation
-8. quality_checks.py - Quality validation
-9. anomaly_alerts.py - Anomaly detection
-10. bias_slicing.py - Bias analysis
+** Run from Data-Pipeline/ directory**
 
-**Each script:**
+**1. download_coco2017.py**
 
-- Independent and reusable
-- Command-line arguments
-- Comprehensive logging
-- Error handling
+- Downloads COCO 2017 with resume support
+- Usage: `python scripts/download_coco2017.py --out data/raw_zips --subset val`
+
+**2. extract_zips.py**
+
+- Extracts downloaded archives
+- Creates completion markers
+
+**3. convert_coco_to_yolo.py**
+
+- Converts COCO JSON to YOLO text format
+- Bounding box: [class, x_center, y_center, width, height] (normalized)
+
+**4. fill_missing_labels.py**
+
+- Creates empty label files for images without annotations
+- Ensures every image has a label file (YOLO requirement)
+
+**5. preprocess_images.py**
+
+- Symlink mode: Links to original images (saves 19GB disk space)
+- Alternative copy mode available if resizing needed
+
+**6. create_splits.py**
+
+- Stratified train/val/test splits
+- **Implements bias mitigation** through balanced sampling
+
+**7. schema_stats.py**
+
+- Generates schema.json and stats.json
+- Validates data structure
+
+**8. quality_checks.py**
+
+- Validates image readability, label format, bbox ranges
+- Outputs quality.json
+
+**9. anomaly_alerts.py**
+
+- Analyzes quality results
+- Emits alerts to logs (ALERT: prefix in Airflow logs)
+
+**10. bias_slicing.py**
+
+- Slices data by scene complexity
+- Outputs bias.md report
 
 ---
 
-## Project Structure
+## 🐳 Docker Deployment
+
+### What's Included
+
+**Docker Compose Stack** (docker-compose.airflow.yml):
+
+**Services:**
+
+- Airflow webserver (UI on port 8080)
+- Airflow scheduler (executes tasks)
+- PostgreSQL (metadata database)
+
+**Volume Mounts:**
+
+- Data-Pipeline/ → /opt/airflow/repo/Data-Pipeline/
+- Shares code and data between host and container
+
+**Login Credentials:**
+
+- Username: admin
+- Password: admin
+- (Created during container initialization)
+
+### Why Docker for This Project
+
+**Solves Real Problems:**
+
+- Airflow + PyTorch dependency conflicts avoided
+- Identical environment for all team members
+- Matches how Airflow runs in production
+
+**Benefits:**
+
+- One command to start (`docker-compose up`)
+- No Python version issues
+- PostgreSQL included (better than SQLite)
+- Easy cleanup (`docker-compose down`)
+
+---
+
+## Folder Structure
 
 ```
 Data-Pipeline/
 ├── dags/
 │   └── dvc_coco_pipeline.py          # Airflow DAG
 ├── scripts/                           # 10 modular scripts
+│   ├── download_coco2017.py
+│   ├── extract_zips.py
+│   ├── convert_coco_to_yolo.py
+│   ├── fill_missing_labels.py
+│   ├── preprocess_images.py
+│   ├── create_splits.py
+│   ├── schema_stats.py
+│   ├── quality_checks.py
+│   ├── anomaly_alerts.py
+│   └── bias_slicing.py
 ├── tests/                             # 5 test modules
-├── .dvc/                              # DVC configuration
+│   ├── test_ci_smoke.py
+│   ├── test_dvc_yaml_valid.py
+│   ├── test_quality_invariants.py
+│   ├── test_splits_integrity.py
+│   └── test_reports_exist_and_parse.py
+├── .dvc/
+│   └── config                         # DVC configuration
 ├── data/                              # Data directory (DVC tracked)
-│   ├── raw_zips/                     # Downloads
-│   ├── raw/                          # Extracted COCO
-│   ├── processed/                    # YOLO format
-│   ├── splits/                       # Train/val/test
-│   └── reports/                      # Quality reports
-├── dvc.yaml                           # DVC pipeline
+│   ├── raw_zips/
+│   ├── raw/
+│   ├── processed/
+│   ├── splits/
+│   └── reports/
+├── dvc.yaml                           # DVC pipeline definition
 ├── dvc.lock                           # DVC lockfile
-├── requirements.txt                   # Dependencies
-├── pytest.ini                         # Test config
+├── requirements.txt                   # Dependencies: pytest, requests, tqdm, pillow, pyyaml, dvc
+├── pytest.ini                         # Pytest configuration
+├── .dvcignore                         # DVC ignore patterns
 └── README.md                          # This file
 ```
 
-**Parent directory:**
+**Parent directory contains:**
 
 - Dockerfile.airflow
 - docker-compose.airflow.yml
@@ -570,108 +617,142 @@ Data-Pipeline/
 
 ---
 
-## Pipeline Visualizations
+## Quality Reports (Actual Outputs)
 
-**Airflow Screenshots in docs/:**
+### Schema & Statistics
 
-**airflow_graph_success.png**
+**Files generated:**
 
-- DAG graph view
-- All 8 tasks with dependencies
-- Successful execution (green)
+- data/reports/schema.json
+- data/reports/stats.json
 
-**airflow_gantt_success.png**
+**Example stats (from your run):**
 
-- Execution timeline
-- Task duration breakdown
-- Bottleneck identification
+- Train images: 106,411
+- Val images: 5,000
+- Test images: 11,876
+- Total classes: 80
+- Mean objects per image: ~7.2
 
-**dvcDAG.png**
+### Quality Validation
 
-- DVC pipeline visualization
-- Data lineage graph
+**File:** data/reports/quality.json
+
+**Key metrics (from your run):**
+
+- Missing labels: 0 (all images have labels)
+- Empty labels: 1,069 total (images with no objects)
+- Invalid YOLO lines: 0
+- Invalid bounding boxes: 0
+- Class IDs: All in valid range [0-79]
+
+** No critical quality issues detected**
+
+### Bias Analysis
+
+**File:** data/reports/bias.md
+
+**Distribution across splits (from your run):**
+
+**Train:** 30.68% simple, 36.29% moderate, 33.03% complex  
+**Val:** 31.32% simple, 34.72% moderate, 33.96% complex  
+**Test:** 30.78% simple, 36.06% moderate, 33.16% complex
+
+**Analysis:** Distribution is consistent across all splits. No significant bias detected.
+
+**Mitigation:** Stratified splitting maintains balanced representation. No additional re-sampling required.
 
 ---
 
-## Development Workflow
+## Troubleshooting
 
-### For Local Development (Optional)
+### Common Issues
 
-**If you want to modify scripts:**
+**Issue: "dvc.yaml not found"**
 
 ```bash
+# Make sure you're in Data-Pipeline/ directory
 cd Data-Pipeline
-
-# Setup
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Test changes
-python scripts/download_coco2017.py --help
-
-# Run tests
-pytest tests/ -v
-
-# Run DVC pipeline
 dvc repro
 ```
 
-**When to use local setup:**
+**Issue: "Out of disk space"**
 
-- Script development
-- Quick testing
-- Debugging
-- No Docker available
+```bash
+# Check available space
+df -h
 
-**When to use Docker:**
+# Pipeline uses symlinks to save space (preprocess_images_link mode)
+```
 
-- Running complete pipeline
-- Demonstrating to team/professor
-- Production deployment
-- Avoiding dependency issues
+**Issue: "Docker container fails to start"**
+
+```bash
+# Check Docker is running
+docker ps
+
+# View logs
+docker-compose -f docker-compose.airflow.yml logs
+
+# Restart
+docker-compose -f docker-compose.airflow.yml restart
+```
+
+**Issue: "Tests fail"**
+
+```bash
+# Ensure pipeline completed first
+cd Data-Pipeline
+dvc status
+
+# Run reports to generate test dependencies
+dvc repro reports
+
+# Then run tests
+pytest tests/ -v
+```
+
+**Issue: "Can't login to Airflow"**
+
+- Username: admin
+- Password: admin
+- (Set in docker-compose.airflow.yml)
 
 ---
 
-## MLOps Best Practices
+## Pipeline Visualizations
 
-### What This Project Demonstrates
+**Included in docs/ folder:**
 
-**1. Containerization**
+**airflow_graph_success.png** - DAG graph showing all 8 tasks and dependencies
 
-- Docker for reproducible environments
-- Production-ready deployment
-- Dependency isolation
+**airflow_gantt_success.png** - Execution timeline showing task durations; reports stage identified as bottleneck
 
-**2. Workflow Orchestration**
+**dvcDAG.png** - DVC pipeline visualization showing data lineage
 
-- Airflow for complex workflows
-- DVC for data-centric pipelines
-- Hybrid approach (Airflow + DVC)
+---
 
-**3. Data Version Control**
+## MLOps Practices Demonstrated
 
-- DVC tracks data via hashes
-- Reproducible data transformations
-- Git for code, DVC for data
+**1. Containerization** - Docker for reproducible deployment
 
-**4. Testing & Quality**
+**2. Workflow Orchestration** - Airflow + DVC hybrid approach
 
-- Pytest for automated testing
-- CI/CD with GitHub Actions
-- Quality gates prevent bad data
+**3. Data Versioning** - DVC tracks data via hashes
 
-**5. Monitoring & Observability**
+**4. Testing & CI/CD** - Pytest + GitHub Actions
 
-- Airflow UI for real-time monitoring
-- Schema validation for data quality
-- Anomaly detection for data issues
+**5. Monitoring** - Airflow UI for real-time pipeline status
 
-**6. Fairness & Ethics**
+**6. Quality Assurance** - Schema validation, quality checks, anomaly detection
 
-- Bias detection via data slicing
-- Mitigation through stratified sampling
-- Documented trade-offs
+**7. Fairness** - Bias detection via data slicing + mitigation via stratified sampling
+
+**8. Modularity** - Reusable, independently testable scripts
+
+**9. Error Handling** - Retries, logging, graceful failures
+
+**10. Documentation** - Comprehensive README, inline comments
 
 ---
 
@@ -688,15 +769,16 @@ dvc repro
 
 ---
 
+## License
+
+MIT License - See LICENSE file
+
 ## Acknowledgments
 
 - COCO Dataset: Lin et al., "Microsoft COCO: Common Objects in Context", ECCV 2014
-- Apache Airflow community
-- DVC team
-- Course materials from Prof. Mohammadi
+- Apache Airflow, DVC communities
+- Prof. Ramin Mohammadi's course materials
 
 ---
 
 **Repository:** https://github.com/hemanth1403/IE7374-MLOps-Adaptive-ML-Inference
-
-<!-- _Last Updated: February 24, 2026_ -->
