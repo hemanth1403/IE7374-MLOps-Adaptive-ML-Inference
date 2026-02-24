@@ -290,7 +290,7 @@ dvc repro -f reports
 
 **Output:** data/reports/quality.json
 
-**Example results (from your actual run):**
+**Example results:**
 
 ```json
 {
@@ -344,7 +344,7 @@ We slice data by scene complexity based on object count:
 
 **Output:** data/reports/bias.md
 
-**Example results (from your actual run):**
+**Example results:**
 
 ```
 Train:
@@ -638,7 +638,7 @@ Data-Pipeline/
 
 **File:** data/reports/quality.json
 
-**Key metrics (from your run):**
+**Key metrics:**
 
 - Missing labels: 0 (all images have labels)
 - Empty labels: 1,069 total (images with no objects)
@@ -652,7 +652,7 @@ Data-Pipeline/
 
 **File:** data/reports/bias.md
 
-**Distribution across splits (from your run):**
+**Distribution across splits:**
 
 **Train:** 30.68% simple, 36.29% moderate, 33.03% complex  
 **Val:** 31.32% simple, 34.72% moderate, 33.96% complex  
