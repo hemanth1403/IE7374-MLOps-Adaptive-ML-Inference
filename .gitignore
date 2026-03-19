@@ -1,6 +1,7 @@
 .venv/
 .pytest_cache/
 logs/
+cmd.txt
 
 # pipeline data (now under Data-Pipeline/)
 Data-Pipeline/data/
