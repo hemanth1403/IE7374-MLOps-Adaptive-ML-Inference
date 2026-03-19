@@ -11,7 +11,7 @@ def link_or_copy(src: Path, dst: Path):
     if dst.exists():
         return
     try:
-        os.symlink(src, dst)  # works in many setups; otherwise falls back
+        os.symlink(src.resolve(), dst)  # works in many setups; otherwise falls back
     except Exception:
         shutil.copy2(src, dst)
 
