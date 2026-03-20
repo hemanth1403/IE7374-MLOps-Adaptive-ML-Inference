@@ -1,0 +1,6 @@
+pyyaml
+ultralytics
+mlflow
+pandas
+matplotlib
+pytest

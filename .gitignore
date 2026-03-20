@@ -16,3 +16,6 @@ Data-Pipeline/logs/
 
 __pycache__/
 *.pyc
+
+model_pipeline/artifacts/*
+!model_pipeline/artifacts/.gitkeep
