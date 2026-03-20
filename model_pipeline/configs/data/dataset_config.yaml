@@ -1,4 +1,3 @@
-@"
 project_name: adaptive_ml_inference
 
 data_pipeline_root: Data-Pipeline
@@ -25,4 +24,3 @@ validation:
   require_test_split: true
   require_label_files: true
   require_reports: true
-"@ | Set-Content "model_pipeline\configs\data\dataset_config.yaml"

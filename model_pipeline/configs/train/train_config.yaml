@@ -1,4 +1,3 @@
-@"
 project_name: adaptive_ml_inference
 
 training:
@@ -39,4 +38,3 @@ selection:
   strategy: keep_all_tiers
   primary_metric: mAP50_95
   secondary_metric: latency_ms
-"@ | Set-Content "model_pipeline\configs\train\train_config.yaml"

@@ -1,4 +1,3 @@
-@"
 evaluation:
   split: test
   metrics:
@@ -26,4 +25,3 @@ outputs:
 comparison:
   generate_summary_table: true
   generate_latency_accuracy_plot: true
-"@ | Set-Content "model_pipeline\configs\eval\eval_config.yaml"

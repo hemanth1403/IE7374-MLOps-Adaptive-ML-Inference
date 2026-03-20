@@ -1,4 +1,3 @@
-@"
 # Model Pipeline Contract
 
 ## Purpose
@@ -56,4 +55,3 @@ Downstream services should be able to consume:
 
 ## Notes
 This contract is intentionally versioned in the repository so all team members follow the same assumptions.
-"@ | Set-Content "shared\contracts\model_contract.md"

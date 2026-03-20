@@ -1,4 +1,3 @@
-@"
 tracking:
   enabled: true
   backend: mlflow
@@ -14,4 +13,3 @@ logging:
 artifacts:
   register_best_model: false
   registry_name_prefix: adaptive-inference
-"@ | Set-Content "model_pipeline\configs\tracking\mlflow_config.yaml"
