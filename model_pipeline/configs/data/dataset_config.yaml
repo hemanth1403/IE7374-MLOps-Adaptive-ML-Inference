@@ -1,0 +1,28 @@
+@"
+project_name: adaptive_ml_inference
+
+data_pipeline_root: Data-Pipeline
+
+paths:
+  images_train: Data-Pipeline/data/processed/images/train2017
+  images_val: Data-Pipeline/data/processed/images/val2017
+  labels_train: Data-Pipeline/data/processed/labels/train2017
+  labels_val: Data-Pipeline/data/processed/labels/val2017
+  split_train: Data-Pipeline/data/splits/train.txt
+  split_val: Data-Pipeline/data/splits/val.txt
+  split_test: Data-Pipeline/data/splits/test.txt
+  reports_dir: Data-Pipeline/data/reports
+
+dataset:
+  format: yolo
+  num_classes: 80
+  class_names_source: coco
+  image_extension: .jpg
+
+validation:
+  require_train_split: true
+  require_val_split: true
+  require_test_split: true
+  require_label_files: true
+  require_reports: true
+"@ | Set-Content "model_pipeline\configs\data\dataset_config.yaml"

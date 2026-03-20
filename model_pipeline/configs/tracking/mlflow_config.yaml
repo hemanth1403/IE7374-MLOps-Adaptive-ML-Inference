@@ -1,0 +1,17 @@
+@"
+tracking:
+  enabled: true
+  backend: mlflow
+  experiment_name: adaptive-ml-inference
+  tracking_uri: http://localhost:5000
+
+logging:
+  log_params: true
+  log_metrics: true
+  log_artifacts: true
+  log_model: true
+
+artifacts:
+  register_best_model: false
+  registry_name_prefix: adaptive-inference
+"@ | Set-Content "model_pipeline\configs\tracking\mlflow_config.yaml"

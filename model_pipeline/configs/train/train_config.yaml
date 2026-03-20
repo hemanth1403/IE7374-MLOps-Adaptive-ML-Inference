@@ -1,0 +1,42 @@
+@"
+project_name: adaptive_ml_inference
+
+training:
+  task: detect
+  framework: ultralytics_yolo
+  device: auto
+  epochs: 10
+  batch_size: 16
+  image_size: 640
+  workers: 4
+  patience: 20
+  seed: 42
+  deterministic: true
+
+models:
+  - name: yolo_nano
+    weights: yolov8n.pt
+    output_subdir: yolo_nano
+
+  - name: yolo_small
+    weights: yolov8s.pt
+    output_subdir: yolo_small
+
+  - name: yolo_large
+    weights: yolov8l.pt
+    output_subdir: yolo_large
+
+data:
+  dataset_config: model_pipeline/configs/data/dataset_config.yaml
+
+outputs:
+  root_dir: model_pipeline/artifacts
+  checkpoints_dir: model_pipeline/artifacts/checkpoints
+  exported_dir: model_pipeline/artifacts/exported
+  manifests_dir: model_pipeline/artifacts/manifests
+
+selection:
+  strategy: keep_all_tiers
+  primary_metric: mAP50_95
+  secondary_metric: latency_ms
+"@ | Set-Content "model_pipeline\configs\train\train_config.yaml"

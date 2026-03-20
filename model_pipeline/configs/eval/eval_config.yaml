@@ -1,0 +1,29 @@
+@"
+evaluation:
+  split: test
+  metrics:
+    - mAP50
+    - mAP50_95
+    - precision
+    - recall
+    - latency_ms
+    - throughput_fps
+
+benchmark:
+  batch_sizes:
+    - 1
+    - 4
+    - 8
+  warmup_runs: 10
+  timed_runs: 50
+  device: auto
+
+outputs:
+  metrics_dir: model_pipeline/reports/metrics
+  benchmark_dir: model_pipeline/reports/benchmarks
+  figures_dir: model_pipeline/reports/figures
+
+comparison:
+  generate_summary_table: true
+  generate_latency_accuracy_plot: true
+"@ | Set-Content "model_pipeline\configs\eval\eval_config.yaml"
