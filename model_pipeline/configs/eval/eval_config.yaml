@@ -15,7 +15,7 @@ benchmark:
     - 8
   warmup_runs: 10
   timed_runs: 50
-  device: auto
+  device: cpu
 
 outputs:
   metrics_dir: model_pipeline/reports/metrics

@@ -19,3 +19,11 @@ __pycache__/
 
 model_pipeline/artifacts/*
 !model_pipeline/artifacts/.gitkeep
+model_pipeline/reports/*
+!model_pipeline/reports/.gitkeep
+
+yolov8n.pt
+yolov8s.pt
+yolov8l.pt
+*.pt
+runs/

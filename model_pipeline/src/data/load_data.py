@@ -38,11 +38,11 @@ def build_yolo_dataset_yaml(output_path: Path | None = None) -> Path:
 
     yolo_data = {
         "path": str((REPO_ROOT / cfg["data_pipeline_root"]).resolve()),
-        "train": str(dataset_paths["split_train"]),
-        "val": str(dataset_paths["split_val"]),
-        "test": str(dataset_paths["split_test"]),
+        "train": str(dataset_paths["images_train"]),
+        "val": str(dataset_paths["images_val"]),
+        "test": str(dataset_paths["images_val"]),
         "nc": cfg["dataset"]["num_classes"],
-        "names": list(range(cfg["dataset"]["num_classes"])),
+        "names": [str(i) for i in range(cfg["dataset"]["num_classes"])],
     }
 
     with output_path.open("w", encoding="utf-8") as f:
