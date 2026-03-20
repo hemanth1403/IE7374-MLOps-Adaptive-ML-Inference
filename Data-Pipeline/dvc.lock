@@ -5,8 +5,8 @@ stages:
     deps:
     - path: scripts/download_coco2017.py
       hash: md5
-      md5: a09e84a95c84878edd731ccd3df78fa5
-      size: 2870
+      md5: 90172354df68bce635dec110ccc85ae6
+      size: 2947
     outs:
     - path: data/raw_zips/annotations_trainval2017.zip
       hash: md5
@@ -31,13 +31,13 @@ stages:
       size: 815585330
     - path: scripts/extract_zips.py
       hash: md5
-      md5: b21782dc095f6eee868ede7b7379d19a
-      size: 1057
+      md5: a315f77a9b38c7aa52e06235e9ea8b09
+      size: 1089
     outs:
     - path: data/raw/.val_extracted.done
       hash: md5
-      md5: eff5bc1ef8ec9d03e640fc4370f5eacd
-      size: 3
+      md5: e02f288d5ef7b53b6112665d1bbc29d8
+      size: 4
     - path: data/raw/annotations
       hash: md5
       md5: 1b4ce3d407ac70dc7f3a4c0933f77469.dir
@@ -53,8 +53,8 @@ stages:
     deps:
     - path: scripts/download_coco2017.py
       hash: md5
-      md5: a09e84a95c84878edd731ccd3df78fa5
-      size: 2870
+      md5: 90172354df68bce635dec110ccc85ae6
+      size: 2947
     outs:
     - path: data/raw_zips/train2017.zip
       hash: md5
@@ -71,13 +71,13 @@ stages:
       size: 19336861798
     - path: scripts/extract_zips.py
       hash: md5
-      md5: b21782dc095f6eee868ede7b7379d19a
-      size: 1057
+      md5: a315f77a9b38c7aa52e06235e9ea8b09
+      size: 1089
     outs:
     - path: data/raw/.train_extracted.done
       hash: md5
-      md5: eff5bc1ef8ec9d03e640fc4370f5eacd
-      size: 3
+      md5: e02f288d5ef7b53b6112665d1bbc29d8
+      size: 4
     - path: data/raw/train2017
       hash: md5
       md5: 107409cf0f5a123bade82b25cbfa38b8.dir
@@ -89,12 +89,12 @@ stages:
     deps:
     - path: data/raw/.train_extracted.done
       hash: md5
-      md5: eff5bc1ef8ec9d03e640fc4370f5eacd
-      size: 3
+      md5: e02f288d5ef7b53b6112665d1bbc29d8
+      size: 4
     - path: data/raw/.val_extracted.done
       hash: md5
-      md5: eff5bc1ef8ec9d03e640fc4370f5eacd
-      size: 3
+      md5: e02f288d5ef7b53b6112665d1bbc29d8
+      size: 4
     - path: data/raw/annotations/instances_train2017.json
       hash: md5
       md5: 20542493efc7df5d9340522b7c87b06c
@@ -105,8 +105,8 @@ stages:
       size: 19987840
     - path: scripts/convert_coco_to_yolo.py
       hash: md5
-      md5: b5b3785caeba9f252607d837a40ac395
-      size: 2527
+      md5: 875e2dfe3f7c9e39a6c7d2ad7dfbe3a2
+      size: 2604
     - path: scripts/fill_missing_labels.py
       hash: md5
       md5: be2997651c9ebf77c3c00375e6786b89
@@ -114,12 +114,12 @@ stages:
     outs:
     - path: data/processed/coco.names
       hash: md5
-      md5: 571d630ea11ec39c0b6e6e9ff216b151
-      size: 620
+      md5: a0a1f162783325f13da3f9840cf172f0
+      size: 699
     - path: data/processed/labels
       hash: md5
-      md5: b2db910eeaa20f6e1d3af510ed04977a.dir
-      size: 34183968
+      md5: 947674f4df70e10bae6a98e16fa6b692.dir
+      size: 35070252
       nfiles: 123287
   preprocess_images_link:
     cmd: python scripts/preprocess_images.py --raw data/raw --processed 
@@ -127,12 +127,12 @@ stages:
     deps:
     - path: data/raw/.train_extracted.done
       hash: md5
-      md5: eff5bc1ef8ec9d03e640fc4370f5eacd
-      size: 3
+      md5: e02f288d5ef7b53b6112665d1bbc29d8
+      size: 4
     - path: data/raw/.val_extracted.done
       hash: md5
-      md5: eff5bc1ef8ec9d03e640fc4370f5eacd
-      size: 3
+      md5: e02f288d5ef7b53b6112665d1bbc29d8
+      size: 4
     - path: data/raw/train2017
       hash: md5
       md5: 107409cf0f5a123bade82b25cbfa38b8.dir
@@ -164,18 +164,18 @@ stages:
       nfiles: 123287
     - path: data/processed/labels
       hash: md5
-      md5: b2db910eeaa20f6e1d3af510ed04977a.dir
-      size: 34183968
+      md5: 947674f4df70e10bae6a98e16fa6b692.dir
+      size: 35070252
       nfiles: 123287
     - path: scripts/create_splits.py
       hash: md5
-      md5: db3090c94ab49ff27bbfa8a69ab80ca7
-      size: 1331
+      md5: 5dbc170d2e919ce526f7bc6247ca346f
+      size: 1370
     outs:
     - path: data/splits
       hash: md5
-      md5: d0399b10b76c6f4a16fc69446946d520.dir
-      size: 6031063
+      md5: b9c88eb00c4549fb4bbabd5da5823a6d.dir
+      size: 6154350
       nfiles: 3
   reports:
     cmd: "python scripts/schema_stats.py --processed data/processed --splits data/splits
@@ -186,22 +186,22 @@ stages:
     deps:
     - path: data/processed
       hash: md5
-      md5: 7ed6c5baca6e221123a0a700eefe2501.dir
-      size: 20163356148
+      md5: f2c8e1010b6192d9f1f1c35679959153.dir
+      size: 20164242511
       nfiles: 246575
     - path: data/splits
       hash: md5
-      md5: d0399b10b76c6f4a16fc69446946d520.dir
-      size: 6031063
+      md5: b9c88eb00c4549fb4bbabd5da5823a6d.dir
+      size: 6154350
       nfiles: 3
     - path: scripts/anomaly_alerts.py
       hash: md5
-      md5: 358a829c9203a0ae838416d758f2198e
-      size: 1065
+      md5: 42ce5dfb19ac899dea3aa231395573d1
+      size: 1096
     - path: scripts/bias_slicing.py
       hash: md5
-      md5: 9aba3b9b96dcb70e4d69b20ee559bdf9
-      size: 2481
+      md5: 6a8fcd83cd747a92c937c41dbd4f1bc7
+      size: 2557
     - path: scripts/quality_checks.py
       hash: md5
       md5: f7c2cbf662bb211225c3bd79d8d770b9
@@ -213,6 +213,6 @@ stages:
     outs:
     - path: data/reports
       hash: md5
-      md5: 8c9480350478f69d4a69b1378770627d.dir
-      size: 2893
+      md5: b77ba5604e95c939e24e8e69c8787464.dir
+      size: 3058
       nfiles: 4
