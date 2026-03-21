@@ -67,15 +67,14 @@ class WindowBufferManager:
 # Why this is effective:
 # Reduced Agent Overhead: Instead of running the RL Inference 30 times a second (30 FPS), this manager ensures the RL agent only runs 3 times a second (for a window of 10). This leaves more GPU overhead for your YOLOv8 models.
 
-# Smoothing: By taking the np.mean of the visual features, you filter out sensor noise or sudden motion blur that might confuse the RL agent.
+# Smoothing: 
+# By taking the np.mean of the visual features, you filter out sensor noise or sudden motion blur that might confuse the RL agent.
 
-# The "Delta" Insight: Calculating count_delta is huge for autonomous perception. If the count is increasing (+3 objects in 10 frames), it’s a strong signal for the agent to switch to a larger model before the scene gets too crowded.
+# The "Delta" Insight: 
+# Calculating count_delta is huge for autonomous perception. If the count is increasing (+3 objects in 10 frames), it’s a strong signal for the agent to switch to a larger model before the scene gets too crowded.
 
 # How it fits into the flow:
 # features.py extracts raw data from Frame 1.
-
 # buffer_manager.py stores it.
-
 # When frame_counter == 10, buffer_manager sends the aggregated data to agent.py.
-
 # agent.py decides the model for Frames 11–20.
