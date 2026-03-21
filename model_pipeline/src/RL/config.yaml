@@ -1,0 +1,42 @@
+# Project: Adaptive ML Inference
+# Version: 1.0.0
+
+paths:
+  dataset: "data/processed"
+  models_dir: "models"
+  yolo_variants:
+    nano: "models/yolov8n.pt"
+    small: "models/yolov8s.pt"
+    large: "models/yolov8l.pt"
+  rl_agent: "models/rl_bandit_v1.pth"
+  logs: "logs/mlflow"
+
+hyperparameters:
+  window_size: 10 # Number of frames per RL decision
+  learning_rate: 0.001 # Agent learning rate
+  epsilon_start: 0.1 # Initial exploration rate
+  epsilon_decay: 0.95 # Decay per episode
+  hidden_dim: 64 # MLP hidden layer size
+
+reward_weights:
+  alpha: 0.5 # Latency penalty weight
+  beta: 0.1 # Switching (stability) penalty
+  latency_budget: 0.030 # 30ms target (to hit that 58% reduction)
+
+environment:
+  resize_dim: [32, 32] # Dimensions for visual feature extraction
+  device: "cuda" # 'cuda' for your RTX 5060 or 'cpu'
+
+
+# How to use it in your code
+# To make this work, you'll want to add a small helper in your scripts (like orchestrator.py or train_rl.py) to load these settings:
+
+# import yaml
+
+# def load_config(config_path="config.yaml"):
+#     with open(config_path, "r") as f:
+#         return yaml.safe_load(f)
+
+# Example usage:
+# config = load_config()
+# alpha = config['reward_weights']['alpha']
