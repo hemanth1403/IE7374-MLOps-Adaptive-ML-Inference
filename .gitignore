@@ -44,6 +44,7 @@ model_pipeline/reports/**
 !model_pipeline/reports/bias/bias_table.csv
 !model_pipeline/reports/bias/bias_summary.json
 !model_pipeline/reports/bias/bias_report.md
+model_pipeline/artifacts/dataset.runtime.yaml
 
 yolov8n.pt
 yolov8s.pt
