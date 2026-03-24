@@ -40,6 +40,11 @@ model_pipeline/reports/**
 !model_pipeline/reports/figures/model_comparison_summary.json
 !model_pipeline/reports/figures/slice_comparison_summary.json
 !model_pipeline/reports/figures/slice_comparison_table.csv
+!model_pipeline/reports/bias/
+!model_pipeline/reports/bias/bias_table.csv
+!model_pipeline/reports/bias/bias_summary.json
+!model_pipeline/reports/bias/bias_report.md
+
 yolov8n.pt
 yolov8s.pt
 yolov8l.pt

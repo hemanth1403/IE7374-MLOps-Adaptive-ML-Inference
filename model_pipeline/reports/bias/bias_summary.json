@@ -1,0 +1,139 @@
+{
+  "slice_definitions": {
+    "simple": "<=2 objects",
+    "moderate": "3-7 objects",
+    "complex": ">=8 objects"
+  },
+  "thresholds": {
+    "latency_gap_flag_pct": 100.0,
+    "throughput_gap_flag_pct": -50.0
+  },
+  "models": {
+    "yolo_large": {
+      "best_latency_ms": 609.2328199883923,
+      "best_throughput_fps": 1.641408616198735,
+      "slices": {
+        "simple": {
+          "model_name": "yolo_large",
+          "slice": "simple",
+          "num_images": 10,
+          "avg_latency_ms": 737.6445,
+          "throughput_fps": 1.3557,
+          "latency_gap_pct": 21.08,
+          "throughput_gap_pct": -17.41,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "moderate": {
+          "model_name": "yolo_large",
+          "slice": "moderate",
+          "num_images": 10,
+          "avg_latency_ms": 611.6461,
+          "throughput_fps": 1.6349,
+          "latency_gap_pct": 0.4,
+          "throughput_gap_pct": -0.39,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "complex": {
+          "model_name": "yolo_large",
+          "slice": "complex",
+          "num_images": 10,
+          "avg_latency_ms": 609.2328,
+          "throughput_fps": 1.6414,
+          "latency_gap_pct": 0.0,
+          "throughput_gap_pct": 0.0,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        }
+      }
+    },
+    "yolo_nano": {
+      "best_latency_ms": 75.08689999813214,
+      "best_throughput_fps": 13.317902324172072,
+      "slices": {
+        "simple": {
+          "model_name": "yolo_nano",
+          "slice": "simple",
+          "num_images": 10,
+          "avg_latency_ms": 105.5378,
+          "throughput_fps": 9.4753,
+          "latency_gap_pct": 40.55,
+          "throughput_gap_pct": -28.85,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "moderate": {
+          "model_name": "yolo_nano",
+          "slice": "moderate",
+          "num_images": 10,
+          "avg_latency_ms": 89.5757,
+          "throughput_fps": 11.1637,
+          "latency_gap_pct": 19.3,
+          "throughput_gap_pct": -16.17,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "complex": {
+          "model_name": "yolo_nano",
+          "slice": "complex",
+          "num_images": 10,
+          "avg_latency_ms": 75.0869,
+          "throughput_fps": 13.3179,
+          "latency_gap_pct": 0.0,
+          "throughput_gap_pct": 0.0,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        }
+      }
+    },
+    "yolo_small": {
+      "best_latency_ms": 133.1992300110869,
+      "best_throughput_fps": 7.507550906388606,
+      "slices": {
+        "simple": {
+          "model_name": "yolo_small",
+          "slice": "simple",
+          "num_images": 10,
+          "avg_latency_ms": 146.6489,
+          "throughput_fps": 6.819,
+          "latency_gap_pct": 10.1,
+          "throughput_gap_pct": -9.17,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "moderate": {
+          "model_name": "yolo_small",
+          "slice": "moderate",
+          "num_images": 10,
+          "avg_latency_ms": 138.3641,
+          "throughput_fps": 7.2273,
+          "latency_gap_pct": 3.88,
+          "throughput_gap_pct": -3.73,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "complex": {
+          "model_name": "yolo_small",
+          "slice": "complex",
+          "num_images": 10,
+          "avg_latency_ms": 133.1992,
+          "throughput_fps": 7.5076,
+          "latency_gap_pct": 0.0,
+          "throughput_gap_pct": 0.0,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        }
+      }
+    }
+  }
+}
