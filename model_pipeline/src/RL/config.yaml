@@ -1,15 +1,25 @@
 # Project: Adaptive ML Inference
 # Version: 1.0.0
 
+# paths:
+#   dataset: "data/processed"
+#   models_dir: "models"
+#   yolo_variants:
+#     nano: "models/yolov8n.pt"
+#     small: "models/yolov8s.pt"
+#     large: "models/yolov8l.pt"
+#   rl_agent: "models/rl_bandit_v1.pth"
+#   logs: "logs/mlflow"
+
 paths:
-  dataset: "data/processed"
-  models_dir: "models"
+  # Updated to match the specific directory structure
+  dataset: "../../Data-Pipeline/data/processed"
+  models_dir: "../../models"
   yolo_variants:
-    nano: "models/yolov8n.pt"
-    small: "models/yolov8s.pt"
-    large: "models/yolov8l.pt"
-  rl_agent: "models/rl_bandit_v1.pth"
-  logs: "logs/mlflow"
+    nano: "../../YOLO_Models/yolov8n.pt"
+    small: "../../YOLO_Models/yolov8s.pt"
+    large: "../../YOLO_Models/yolov8l.pt"
+  rl_agent: "../../models/rl_bandit_v1.pth"
 
 hyperparameters:
   window_size: 10 # Number of frames per RL decision

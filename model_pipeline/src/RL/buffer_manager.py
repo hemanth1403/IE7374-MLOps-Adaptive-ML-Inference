@@ -13,13 +13,14 @@ class WindowBufferManager:
         self.visual_buffer = deque(maxlen=window_size)
         self.conf_buffer = deque(maxlen=window_size)
         self.count_buffer = deque(maxlen=window_size)
-        
+        self.edge_buffer = deque(maxlen=window_size)
         self.frame_counter = 0
 
-    def add_frame_data(self, visual_features, confidence=0.0, obj_count=0):
+    def add_frame_data(self, visual_features, edge_val, confidence=0.0, obj_count=0):
         """
         Pushes new frame data into the temporal buffers.
         """
+        self.edge_buffer.append(edge_val)
         self.visual_buffer.append(visual_features)
         self.conf_buffer.append(confidence)
         self.count_buffer.append(obj_count)
@@ -37,6 +38,8 @@ class WindowBufferManager:
         """
         # 1. Mean Visual State (The 'Average' look of the last N frames)
         avg_visual = np.mean(self.visual_buffer, axis=0)
+
+        avg_edge = np.mean(self.edge_buffer)
         
         # 2. Average Confidence of current detections
         avg_conf = np.mean(self.conf_buffer)
@@ -51,7 +54,7 @@ class WindowBufferManager:
             float(count_delta)
         ], dtype=np.float32)
         
-        return avg_visual, metadata
+        return avg_visual, avg_edge, metadata
 
     def reset_window(self):
         """

@@ -7,7 +7,8 @@ from buffer_manager import WindowBufferManager
 
 class MLOpsOrchestrator:
     def __init__(self, window_size=10):
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        # self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu'
         
         # 1. Load YOLO Models (n, s, l)
         print("Loading YOLO variants...")
@@ -46,12 +47,12 @@ class MLOpsOrchestrator:
             obj_count = len(results[0].boxes)
             
             # --- STEP 3: Buffer Update ---
-            self.buffer.add_frame_data(vis_feat, conf, obj_count)
+            self.buffer.add_frame_data(vis_feat, edge_val, conf, obj_count)
             
             # --- STEP 4: RL Decision Point ---
             if self.buffer.is_window_complete():
-                avg_vis, metadata = self.buffer.get_aggregated_state(self.current_model_idx)
-                state = self.extractor.construct_state(avg_vis, [0.0], metadata) # simplifying edge for now
+                avg_vis, avg_edge, metadata = self.buffer.get_aggregated_state(self.current_model_idx)
+                state = self.extractor.construct_state(avg_vis, [avg_edge], metadata) # simplifying edge for now
                 
                 # Agent picks model for the NEXT window
                 self.current_model_idx = self.agent.select_action(state)
