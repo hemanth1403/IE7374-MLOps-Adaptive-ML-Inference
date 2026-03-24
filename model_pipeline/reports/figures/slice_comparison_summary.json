@@ -6,24 +6,24 @@
         "weights_source": "yolov8l.pt",
         "complexity_bucket": "simple",
         "num_images": 10,
-        "avg_latency_ms": 737.6445499947295,
-        "throughput_fps": 1.3556664927669364
+        "avg_latency_ms": 441.5690500289202,
+        "throughput_fps": 2.2646514739529544
       },
       "moderate": {
         "model_name": "yolo_large",
         "weights_source": "yolov8l.pt",
         "complexity_bucket": "moderate",
         "num_images": 10,
-        "avg_latency_ms": 611.6460900288075,
-        "throughput_fps": 1.6349323837791583
+        "avg_latency_ms": 426.0835099965334,
+        "throughput_fps": 2.3469577595437476
       },
       "complex": {
         "model_name": "yolo_large",
         "weights_source": "yolov8l.pt",
         "complexity_bucket": "complex",
         "num_images": 10,
-        "avg_latency_ms": 609.2328199883923,
-        "throughput_fps": 1.641408616198735
+        "avg_latency_ms": 404.6513899695128,
+        "throughput_fps": 2.4712629804023205
       }
     },
     "yolo_nano": {
@@ -32,24 +32,24 @@
         "weights_source": "yolov8n.pt",
         "complexity_bucket": "simple",
         "num_images": 10,
-        "avg_latency_ms": 105.53777000168338,
-        "throughput_fps": 9.475280745310892
+        "avg_latency_ms": 66.02921003941447,
+        "throughput_fps": 15.144812415642642
       },
       "moderate": {
         "model_name": "yolo_nano",
         "weights_source": "yolov8n.pt",
         "complexity_bucket": "moderate",
         "num_images": 10,
-        "avg_latency_ms": 89.5756900194101,
-        "throughput_fps": 11.163743196209937
+        "avg_latency_ms": 64.85140004660934,
+        "throughput_fps": 15.419867563094861
       },
       "complex": {
         "model_name": "yolo_nano",
         "weights_source": "yolov8n.pt",
         "complexity_bucket": "complex",
         "num_images": 10,
-        "avg_latency_ms": 75.08689999813214,
-        "throughput_fps": 13.317902324172072
+        "avg_latency_ms": 71.66682002134621,
+        "throughput_fps": 13.953458514025689
       }
     },
     "yolo_small": {
@@ -58,24 +58,24 @@
         "weights_source": "yolov8s.pt",
         "complexity_bucket": "simple",
         "num_images": 10,
-        "avg_latency_ms": 146.64891997817904,
-        "throughput_fps": 6.819006919033548
+        "avg_latency_ms": 123.86051993817091,
+        "throughput_fps": 8.073597628196485
       },
       "moderate": {
         "model_name": "yolo_small",
         "weights_source": "yolov8s.pt",
         "complexity_bucket": "moderate",
         "num_images": 10,
-        "avg_latency_ms": 138.36412999080494,
-        "throughput_fps": 7.227306673098407
+        "avg_latency_ms": 121.53941004071385,
+        "throughput_fps": 8.227783890550525
       },
       "complex": {
         "model_name": "yolo_small",
         "weights_source": "yolov8s.pt",
         "complexity_bucket": "complex",
         "num_images": 10,
-        "avg_latency_ms": 133.1992300110869,
-        "throughput_fps": 7.507550906388606
+        "avg_latency_ms": 125.83867001812905,
+        "throughput_fps": 7.946682842848976
       }
     }
   },

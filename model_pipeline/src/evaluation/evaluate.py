@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import yaml
+import mlflow
 
 from ultralytics import YOLO
 
@@ -37,6 +38,8 @@ def main() -> None:
     metrics_dir = REPO_ROOT / eval_cfg["outputs"]["metrics_dir"]
     ensure_dir(metrics_dir)
 
+    mlflow.set_experiment("pretrained_yolo_evaluation")
+
     checkpoints_root = REPO_ROOT / train_cfg["outputs"]["checkpoints_dir"]
 
     for model_cfg in train_cfg["models"]:
@@ -69,6 +72,19 @@ def main() -> None:
         out_path = metrics_dir / f"{model_name}_metrics.json"
         with out_path.open("w", encoding="utf-8") as f:
             json.dump(metrics, f, indent=2)
+
+        with mlflow.start_run(run_name=f"{model_name}_evaluation"):
+            mlflow.log_param("model_name", model_name)
+            mlflow.log_param("weights_source", str(weights_source))
+            mlflow.log_param("split", eval_cfg["evaluation"]["split"])
+            mlflow.log_param("device", eval_cfg["benchmark"]["device"])
+
+            mlflow.log_metric("mAP50", metrics["metrics"]["mAP50"])
+            mlflow.log_metric("mAP50_95", metrics["metrics"]["mAP50_95"])
+            mlflow.log_metric("precision", metrics["metrics"]["precision"])
+            mlflow.log_metric("recall", metrics["metrics"]["recall"])
+
+            mlflow.log_artifact(str(out_path), artifact_path="metrics")
 
         print(f"Saved metrics to {out_path}")
 

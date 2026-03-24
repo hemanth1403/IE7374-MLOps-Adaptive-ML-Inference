@@ -50,6 +50,7 @@ yolov8s.pt
 yolov8l.pt
 *.pt
 runs/
+mlruns/
 
 model_pipeline/src/RL/models/
 model_pipeline/src/RL/performance_report.png

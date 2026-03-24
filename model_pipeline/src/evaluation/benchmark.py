@@ -5,6 +5,7 @@ import json
 import random
 import time
 import yaml
+import mlflow
 
 from ultralytics import YOLO
 
@@ -164,6 +165,8 @@ def main() -> None:
     benchmark_dir = REPO_ROOT / eval_cfg["outputs"]["benchmark_dir"]
     ensure_dir(benchmark_dir)
 
+    mlflow.set_experiment("pretrained_yolo_benchmark")
+
     checkpoints_root = REPO_ROOT / train_cfg["outputs"]["checkpoints_dir"]
     device = eval_cfg["benchmark"]["device"]
 
@@ -232,6 +235,30 @@ def main() -> None:
         out_path = benchmark_dir / f"{model_name}_benchmark.json"
         with out_path.open("w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
+
+        overall = summary.get("overall", {})
+        by_bucket = summary.get("by_bucket", {})
+
+        with mlflow.start_run(run_name=f"{model_name}_benchmark"):
+            mlflow.log_param("model_name", model_name)
+            mlflow.log_param("weights_source", str(weights_source))
+            mlflow.log_param("device", device)
+            mlflow.log_param("split_name", "train")
+            mlflow.log_param("per_bucket", 10)
+
+            if overall.get("avg_latency_ms") is not None:
+                mlflow.log_metric("overall_avg_latency_ms", overall["avg_latency_ms"])
+            if overall.get("throughput_fps") is not None:
+                mlflow.log_metric("overall_throughput_fps", overall["throughput_fps"])
+
+            for bucket in ["simple", "moderate", "complex"]:
+                bucket_stats = by_bucket.get(bucket, {})
+                if bucket_stats.get("avg_latency_ms") is not None:
+                    mlflow.log_metric(f"{bucket}_avg_latency_ms", bucket_stats["avg_latency_ms"])
+                if bucket_stats.get("throughput_fps") is not None:
+                    mlflow.log_metric(f"{bucket}_throughput_fps", bucket_stats["throughput_fps"])
+
+            mlflow.log_artifact(str(out_path), artifact_path="benchmarks")
 
         print(f"Saved benchmark to {out_path}")
 

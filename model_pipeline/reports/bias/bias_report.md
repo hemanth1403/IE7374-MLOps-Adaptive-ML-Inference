@@ -13,18 +13,18 @@ A slice is flagged when:
 ## Summary
 
 ### yolo_large
-- Best latency: 609.2328 ms
-- Best throughput: 1.6414 FPS
+- Best latency: 404.6514 ms
+- Best throughput: 2.4713 FPS
 - Flagged slices: none
 
 ### yolo_nano
-- Best latency: 75.0869 ms
-- Best throughput: 13.3179 FPS
+- Best latency: 64.8514 ms
+- Best throughput: 15.4199 FPS
 - Flagged slices: none
 
 ### yolo_small
-- Best latency: 133.1992 ms
-- Best throughput: 7.5076 FPS
+- Best latency: 121.5394 ms
+- Best throughput: 8.2278 FPS
 - Flagged slices: none
 
 ## Interpretation
