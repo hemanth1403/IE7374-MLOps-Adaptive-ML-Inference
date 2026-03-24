@@ -20,24 +20,26 @@ __pycache__/
 
 model_pipeline/artifacts/*
 !model_pipeline/artifacts/.gitkeep
-# Ignore generated report clutter by default
+# Keep reports ignored by default
 model_pipeline/reports/**
 
-# But keep submission-ready JSON artifacts
+# Allow submission-ready report directories
 !model_pipeline/reports/benchmarks/
+!model_pipeline/reports/metrics/
+!model_pipeline/reports/figures/
+
+# Allow specific submission artifacts
 !model_pipeline/reports/benchmarks/yolo_nano_benchmark.json
 !model_pipeline/reports/benchmarks/yolo_small_benchmark.json
 !model_pipeline/reports/benchmarks/yolo_large_benchmark.json
 
-!model_pipeline/reports/metrics/
 !model_pipeline/reports/metrics/yolo_nano_metrics.json
 !model_pipeline/reports/metrics/yolo_small_metrics.json
 !model_pipeline/reports/metrics/yolo_large_metrics.json
 
-!model_pipeline/reports/figures/
 !model_pipeline/reports/figures/model_comparison_summary.json
-!model_pipeline/reports/.gitkeep
-
+!model_pipeline/reports/figures/slice_comparison_summary.json
+!model_pipeline/reports/figures/slice_comparison_table.csv
 yolov8n.pt
 yolov8s.pt
 yolov8l.pt
