@@ -1,19 +1,7 @@
-# Project: Adaptive ML Inference
-# Version: 1.0.0
-
-# paths:
-#   dataset: "data/processed"
-#   models_dir: "models"
-#   yolo_variants:
-#     nano: "models/yolov8n.pt"
-#     small: "models/yolov8s.pt"
-#     large: "models/yolov8l.pt"
-#   rl_agent: "models/rl_bandit_v1.pth"
-#   logs: "logs/mlflow"
 
 paths:
   # Updated to match the specific directory structure
-  dataset: "../../Data-Pipeline/data/processed"
+  dataset: "../../../Data-Pipeline/data/processed"
   models_dir: "../../models"
   yolo_variants:
     nano: "../../YOLO_Models/yolov8n.pt"
@@ -35,18 +23,4 @@ reward_weights:
 
 environment:
   resize_dim: [32, 32] # Dimensions for visual feature extraction
-  device: "cuda" # 'cuda' for your RTX 5060 or 'cpu'
-
-
-# How to use it in your code
-# To make this work, you'll want to add a small helper in your scripts (like orchestrator.py or train_rl.py) to load these settings:
-
-# import yaml
-
-# def load_config(config_path="config.yaml"):
-#     with open(config_path, "r") as f:
-#         return yaml.safe_load(f)
-
-# Example usage:
-# config = load_config()
-# alpha = config['reward_weights']['alpha']
+  device: "cuda" 

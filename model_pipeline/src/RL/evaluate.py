@@ -3,6 +3,7 @@ import time
 import pandas as pd
 import matplotlib.pyplot as plt
 from orchestrator import MLOpsOrchestrator
+import numpy as np
 
 class Evaluator:
     def __init__(self, test_video_path):
@@ -29,6 +30,10 @@ class Evaluator:
         # This will run the orchestrator loop and we'll capture metrics
         # For evaluation, we assume orchestrator returns a list of (acc, lat)
         metrics = orchestrator.run_inference(self.video_path) 
+
+        if not metrics:
+            print(f"No metrics collected for mode: {mode}")
+            return
         
         avg_acc = np.mean([m[0] for m in metrics])
         avg_lat = np.mean([m[1] for m in metrics])
@@ -67,15 +72,3 @@ if __name__ == "__main__":
     evaluator.run_benchmark("RL")
     
     evaluator.plot_results()
-
-
-
-
-####################################
-
-# What this Evaluation Proves
-# The "Sweet Spot": In your final graph, you expect the RL-Agent dot to be in the "top-left" quadrant—meaning it has the accuracy of the Large model but is much closer to the latency of the Nano model.
-
-# Latency Reduction: You can mathematically calculate the percentage of reduction from the Fixed-Large baseline.
-
-# Accuracy Maintenance: You can verify if the Avg_Accuracy stays above your 0.95 (95%) threshold

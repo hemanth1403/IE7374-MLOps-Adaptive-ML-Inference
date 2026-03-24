@@ -1,31 +1,28 @@
 import os
 import cv2
+from pathlib import Path
 
 def test_image_loading():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # 1. Project Root: ~/IE7374-MLOps-Adaptive-ML-Inference/
-    project_root = os.path.abspath(os.path.join(script_dir, "../../../"))
+    project_root = Path(__file__).resolve().parents[3]
     
     # 2. Path to the split file
-    # Location: ~/IE7374-MLOps-Adaptive-ML-Inference/Data-Pipeline/data/splits/train.txt
-    split_file = os.path.join(project_root, "Data-Pipeline/data/splits/train.txt")
+    split_file = project_root / "Data-Pipeline" / "data" / "splits" / "train.txt"
 
     if not os.path.exists(split_file):
         print(f"Split file NOT FOUND at: {split_file}")
         return
 
     with open(split_file, 'r') as f:
-        # first_image_rel is "data/processed/images/train2017/000000000009.jpg"
         first_image_rel = f.readline().strip()
 
     # 3. Construct the Full Path
-    # Result: ~/IE7374-MLOps-Adaptive-ML-Inference/Data-Pipeline/data/processed/images/train2017/000000000009.jpg
-    full_path = os.path.join(project_root, "Data-Pipeline", first_image_rel)
+    full_path = project_root / "Data-Pipeline" / first_image_rel
     
     print(f"Checking image path: {full_path}")
     
-    img = cv2.imread(full_path)
+    img = cv2.imread(str(full_path))
     if img is not None:
         print(f"SUCCESS! Image shape: {img.shape}")
     else:

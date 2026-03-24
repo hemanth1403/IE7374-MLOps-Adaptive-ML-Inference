@@ -1,4 +1,5 @@
 .venv/
+.venv-rl/
 .pytest_cache/
 logs/
 cmd.txt
@@ -27,3 +28,6 @@ yolov8s.pt
 yolov8l.pt
 *.pt
 runs/
+# RL local artifacts
+model_pipeline/src/RL/models/rl_bandit_v1.pth
+model_pipeline/src/RL/performance_report.png
