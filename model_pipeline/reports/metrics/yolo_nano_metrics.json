@@ -1,0 +1,11 @@
+{
+  "model_name": "yolo_nano",
+  "weights_source": "yolov8n.pt",
+  "split": "test",
+  "metrics": {
+    "mAP50": 0.5211641302938522,
+    "mAP50_95": 0.3714514365068064,
+    "precision": 0.6351214267500674,
+    "recall": 0.473840267187866
+  }
+}

@@ -20,7 +20,22 @@ __pycache__/
 
 model_pipeline/artifacts/*
 !model_pipeline/artifacts/.gitkeep
-model_pipeline/reports/*
+# Ignore generated report clutter by default
+model_pipeline/reports/**
+
+# But keep submission-ready JSON artifacts
+!model_pipeline/reports/benchmarks/
+!model_pipeline/reports/benchmarks/yolo_nano_benchmark.json
+!model_pipeline/reports/benchmarks/yolo_small_benchmark.json
+!model_pipeline/reports/benchmarks/yolo_large_benchmark.json
+
+!model_pipeline/reports/metrics/
+!model_pipeline/reports/metrics/yolo_nano_metrics.json
+!model_pipeline/reports/metrics/yolo_small_metrics.json
+!model_pipeline/reports/metrics/yolo_large_metrics.json
+
+!model_pipeline/reports/figures/
+!model_pipeline/reports/figures/model_comparison_summary.json
 !model_pipeline/reports/.gitkeep
 
 yolov8n.pt
@@ -28,6 +43,6 @@ yolov8s.pt
 yolov8l.pt
 *.pt
 runs/
-# RL local artifacts
-model_pipeline/src/RL/models/rl_bandit_v1.pth
+
+model_pipeline/src/RL/models/
 model_pipeline/src/RL/performance_report.png
