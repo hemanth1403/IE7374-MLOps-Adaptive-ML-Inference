@@ -11,6 +11,7 @@ Data-Pipeline/.dvc/tmp/
 Data-Pipeline/.pytest_cache/
 Data-Pipeline/logs/
 Data-Pipeline/keys/
+Data-Pipeline/.dvc/config.local
 
 # DVC cache
 .dvc/cache/
