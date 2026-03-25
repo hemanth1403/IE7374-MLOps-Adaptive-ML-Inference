@@ -1,4 +1,5 @@
 [core]
     no_scm = True
+    remote = origin
 ['remote "origin"']
     url = gs://dvcmlopsbucket
