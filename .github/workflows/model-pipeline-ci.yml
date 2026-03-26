@@ -39,11 +39,11 @@ jobs:
           ${{ secrets.GCP_DVC_SERVICE_ACCOUNT_JSON }}
           EOF
 
-      - name: Configure DVC credential path
+      - name: Configure DVC credential path and pull only evaluation data
         working-directory: Data-Pipeline
         run: |
           python -m dvc remote modify --local origin credentialpath keys/rl_orchestration.json
-          python -m dvc pull
+          python -m dvc pull data/processed/images data/processed/labels -r origin -v
 
       - name: Run pretrained evaluation
         run: |
