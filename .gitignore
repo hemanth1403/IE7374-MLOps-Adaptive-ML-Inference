@@ -22,6 +22,7 @@ __pycache__/
 
 model_pipeline/artifacts/*
 !model_pipeline/artifacts/.gitkeep
+!model_pipeline/artifacts/dataset.yaml
 # Keep reports ignored by default
 model_pipeline/reports/**
 
