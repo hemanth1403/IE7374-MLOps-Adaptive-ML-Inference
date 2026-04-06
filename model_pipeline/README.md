@@ -79,7 +79,7 @@ model_pipeline/
 │       ├── evaluate.py
 │       └── generate_slice_comparison.py
 └── tests/
-
+```
 ---
 
 # 4. Directory Overview
@@ -153,7 +153,6 @@ Base dataset metadata used to generate dataset.runtime.yaml
 This pipeline logs experiments to MLflow.
 
 Start the MLflow UI
-###bash
 mlflow ui
 
 Then open:
