@@ -37,6 +37,7 @@ model_pipeline/reports/*
 !model_pipeline/reports/.gitkeep
 model_pipeline/src/YOLO_Models
 model_pipeline/src/RL/models	
+model_pipeline/src/RL/RUN_LOCALLY.md
 
 yolov8n.pt
 yolov8s.pt
