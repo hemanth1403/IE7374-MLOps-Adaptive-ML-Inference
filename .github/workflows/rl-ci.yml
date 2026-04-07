@@ -70,13 +70,19 @@ jobs:
         run: |
           dvc init --no-scm -f
           dvc repro --dry 2>&1 | tee /tmp/dvc_dry.txt || true
-          # Fail only on unexpected errors (missing file errors are OK without data)
-          if grep -q "ERROR" /tmp/dvc_dry.txt && ! grep -q "does not exist" /tmp/dvc_dry.txt; then
-            echo "Unexpected DVC error:"
-            cat /tmp/dvc_dry.txt
-            exit 1
+          # Expected on CI: data deps (COCO split, CSV) don't exist on the runner.
+          # Only fail on truly unexpected errors.
+          if grep -q "ERROR" /tmp/dvc_dry.txt; then
+            if grep -qE "does not exist|No such file or directory|dependency.*missing" /tmp/dvc_dry.txt; then
+              echo "DVC dry-run OK (expected missing data deps on CI)"
+            else
+              echo "Unexpected DVC error:"
+              cat /tmp/dvc_dry.txt
+              exit 1
+            fi
+          else
+            echo "DVC dry-run OK"
           fi
-          echo "DVC dry-run OK"
 
   unit-tests:
     name: Unit tests (no GPU, no dataset)
