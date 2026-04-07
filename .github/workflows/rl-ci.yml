@@ -1,0 +1,198 @@
+name: RL Pipeline CI
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "model_pipeline/src/RL/**"
+      - ".github/workflows/rl-ci.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "model_pipeline/src/RL/**"
+      - ".github/workflows/rl-ci.yml"
+
+defaults:
+  run:
+    working-directory: model_pipeline/src/RL
+
+jobs:
+  lint-and-validate:
+    name: Lint & pipeline validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: rl-pip-${{ hashFiles('model_pipeline/src/RL/requirements.txt') }}
+          restore-keys: rl-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install dvc pytest
+
+      - name: Validate params.yaml
+        run: |
+          python -c "
+          import yaml
+          with open('params.yaml') as f:
+              p = yaml.safe_load(f)
+          required = ['profile', 'reward', 'bc', 'ppo', 'paths']
+          for key in required:
+              assert key in p, f'Missing section: {key}'
+          print('params.yaml OK — sections:', list(p.keys()))
+          "
+
+      - name: Validate dvc.yaml
+        run: |
+          python -c "
+          import yaml
+          with open('dvc.yaml') as f:
+              d = yaml.safe_load(f)
+          stages = list(d['stages'].keys())
+          assert stages == ['profile', 'train', 'evaluate'], f'Unexpected stages: {stages}'
+          print('dvc.yaml OK — stages:', stages)
+          "
+
+      - name: DVC pipeline dry-run
+        run: |
+          dvc init --no-scm -f
+          dvc repro --dry 2>&1 | tee /tmp/dvc_dry.txt || true
+          # Fail only on unexpected errors (missing file errors are OK without data)
+          if grep -q "ERROR" /tmp/dvc_dry.txt && ! grep -q "does not exist" /tmp/dvc_dry.txt; then
+            echo "Unexpected DVC error:"
+            cat /tmp/dvc_dry.txt
+            exit 1
+          fi
+          echo "DVC dry-run OK"
+
+  unit-tests:
+    name: Unit tests (no GPU, no dataset)
+    runs-on: ubuntu-latest
+    needs: lint-and-validate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: rl-pip-${{ hashFiles('model_pipeline/src/RL/requirements.txt') }}
+          restore-keys: rl-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Test environment imports
+        run: |
+          python -c "
+          import sys; sys.path.insert(0, '.')
+          from core.features import FeatureExtractor
+          from core.environment import AdaptiveInferenceEnv
+          print('core imports OK')
+          "
+
+      - name: Test FeatureExtractor (no image)
+        run: |
+          python -c "
+          import sys; sys.path.insert(0, '.')
+          import numpy as np
+          from core.features import FeatureExtractor
+          ext = FeatureExtractor()
+          # Synthetic frame
+          frame = np.random.randint(0, 255, (480, 640, 3), dtype='uint8')
+          vis = ext.get_visual_features(frame)
+          edge = ext.get_edge_density(frame)
+          assert vis.shape == (1024,), f'Expected (1024,), got {vis.shape}'
+          assert edge.shape == (1,),   f'Expected (1,), got {edge.shape}'
+          print('FeatureExtractor OK — vis:', vis.shape, 'edge:', edge.shape)
+          "
+
+      - name: Test observation shape matches environment spec
+        run: |
+          python -c "
+          import sys; sys.path.insert(0, '.')
+          import numpy as np
+          from core.features import FeatureExtractor
+          ext = FeatureExtractor()
+          frame = np.random.randint(0, 255, (480, 640, 3), dtype='uint8')
+          vis   = ext.get_visual_features(frame).flatten()         # 1024
+          edge  = np.array([float(ext.get_edge_density(frame)[0]) * 10.0], dtype='float32')  # 1
+          meta  = np.array([0.0, 0.5, 0.0], dtype='float32')      # 3
+          obs   = np.concatenate([vis, edge, meta])
+          assert obs.shape == (1028,), f'Bad obs shape: {obs.shape}'
+          print('Observation shape OK:', obs.shape)
+          "
+
+      - name: Test reward function
+        run: |
+          python -c "
+          import numpy as np
+
+          def compute_reward(n_conf, s_conf, l_conf, n_time, s_time, l_time,
+                             n_count, s_count, l_count, action,
+                             w_q=0.84, w_e=0.16):
+              confs  = [n_conf,  s_conf,  l_conf]
+              lats   = [n_time,  s_time,  l_time]
+              counts = [n_count, s_count, l_count]
+              quality    = [confs[a] * np.sqrt(counts[a] + 1) for a in range(3)]
+              efficiency = [quality[a] / (lats[a] + 1e-8)     for a in range(3)]
+              q_max   = max(quality)    + 1e-8
+              eff_max = max(efficiency) + 1e-8
+              scores  = [w_q * (quality[a] / q_max) + w_e * (efficiency[a] / eff_max)
+                         for a in range(3)]
+              s_min, s_max = min(scores), max(scores)
+              spread = s_max - s_min
+              return (scores[action] - s_min) / spread if spread > 0.01 else 0.5
+
+          # Simple scene (0 objects, high Nano conf) → Nano should be best
+          # n: conf=0.9, 4ms, 0 objects   s: conf=0.5, 8ms, 0 objects   l: conf=0.4, 25ms, 0 objects
+          r_nano  = compute_reward(0.9, 0.5, 0.4, 0.004, 0.008, 0.025, 0, 0, 0, action=0)
+          r_large = compute_reward(0.9, 0.5, 0.4, 0.004, 0.008, 0.025, 0, 0, 0, action=2)
+          assert r_nano > r_large, f'Nano ({r_nano:.3f}) should beat Large ({r_large:.3f}) on simple scene'
+          assert 0.0 <= r_nano  <= 1.0, f'Reward out of range: {r_nano}'
+          assert 0.0 <= r_large <= 1.0, f'Reward out of range: {r_large}'
+          # Reward must always be in [0, 1]
+          for a in range(3):
+              r = compute_reward(0.9, 0.5, 0.4, 0.004, 0.008, 0.025, 0, 0, 0, action=a)
+              assert 0.0 <= r <= 1.0, f'Action {a} reward {r:.3f} out of [0,1]'
+          print(f'Reward function OK — Nano: {r_nano:.3f}, Large: {r_large:.3f}')
+          "
+
+      - name: Test params.yaml values are in valid range
+        run: |
+          python -c "
+          import yaml
+          with open('params.yaml') as f:
+              p = yaml.safe_load(f)
+          r = p['reward']
+          assert 0 < r['w_quality']  < 1,   'w_quality out of range'
+          assert 0 < r['w_efficiency'] < 1,  'w_efficiency out of range'
+          assert abs(r['w_quality'] + r['w_efficiency'] - 1.0) < 1e-6, \
+              f'Reward weights must sum to 1.0, got {r[\"w_quality\"] + r[\"w_efficiency\"]}'
+          assert r['switching_penalty'] >= 0, 'switching_penalty must be non-negative'
+          assert p['bc']['sample_rows'] >= 1000, 'sample_rows too small'
+          assert p['bc']['epochs'] >= 1,         'epochs must be >= 1'
+          print('params.yaml values OK')
+          "

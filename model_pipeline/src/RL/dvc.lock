@@ -1,0 +1,107 @@
+schema: '2.0'
+stages:
+  profile:
+    cmd: python training/profile_models.py
+    deps:
+    - path: ../../../Data-Pipeline/data/splits/train.txt
+      hash: md5
+      md5: 82172c11a888bab37e8859c1d94ff4b8
+      size: 5214139
+    - path: training/profile_models.py
+      hash: md5
+      md5: 1b070e4dbf0f348f1365683e6dfdd499
+      size: 2910
+    params:
+      params.yaml:
+        profile.device: cpu
+    outs:
+    - path: model_performance_profile.csv
+      hash: md5
+      md5: dada960a94f287f96819b1da9be41c5e
+      size: 24940453
+  train:
+    cmd: python training/pretrain_bc.py
+    deps:
+    - path: core/environment.py
+      hash: md5
+      md5: e9f3429981a031085073628a5fa8accb
+      size: 4872
+    - path: core/features.py
+      hash: md5
+      md5: 41707fd25ff95ba36eac98ad686d2b87
+      size: 2379
+    - path: model_performance_profile.csv
+      hash: md5
+      md5: dada960a94f287f96819b1da9be41c5e
+      size: 24940453
+    - path: training/pretrain_bc.py
+      hash: md5
+      md5: 5d3a783bc5ae13c3e62c43255f88f874
+      size: 11100
+    params:
+      params.yaml:
+        bc:
+          sample_rows: 15000
+          epochs: 30
+          lr: 0.001
+          batch_size: 256
+          hidden_dim: 256
+        paths:
+          profile_csv: model_performance_profile.csv
+          model_dir: models/PPO_v6
+          final_model: models/PPO_v6/final_adaptive_model.zip
+          metrics: metrics.json
+          log_dir: logs
+        ppo:
+          finetune_steps: 0
+          learning_rate: 5e-05
+          ent_coef: 0.02
+          n_steps: 2048
+          batch_size: 64
+          device: cpu
+        reward:
+          w_quality: 0.84
+          w_efficiency: 0.16
+          switching_penalty: 0.02
+          episode_length: 2048
+    outs:
+    - path: models/PPO_v6/bc_init_model.zip
+      hash: md5
+      md5: 86223fce2a464d862bb11eb9a3cf9144
+      size: 2669003
+    - path: models/PPO_v6/final_adaptive_model.zip
+      hash: md5
+      md5: 86223fce2a464d862bb11eb9a3cf9144
+      size: 2669003
+  evaluate:
+    cmd: python training/evaluate_policy.py
+    deps:
+    - path: core/environment.py
+      hash: md5
+      md5: e9f3429981a031085073628a5fa8accb
+      size: 4872
+    - path: model_performance_profile.csv
+      hash: md5
+      md5: dada960a94f287f96819b1da9be41c5e
+      size: 24940453
+    - path: models/PPO_v6/final_adaptive_model.zip
+      hash: md5
+      md5: 86223fce2a464d862bb11eb9a3cf9144
+      size: 2669003
+    - path: training/evaluate_policy.py
+      hash: md5
+      md5: 6fa316d8c27be08aa40613962f3bd0b8
+      size: 2477
+    params:
+      params.yaml:
+        paths:
+          profile_csv: model_performance_profile.csv
+          model_dir: models/PPO_v6
+          final_model: models/PPO_v6/final_adaptive_model.zip
+          metrics: metrics.json
+          log_dir: logs
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: a0e18a6f9a7e491855b9a3dfb1d37c90
+      size: 88

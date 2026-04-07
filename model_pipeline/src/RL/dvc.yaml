@@ -1,0 +1,66 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DVC pipeline — Adaptive ML Inference (RL)
+#
+# Reproduce everything:
+#   dvc repro
+#
+# Pull cached outputs (skip retraining):
+#   dvc pull
+#
+# Compare experiments after changing params.yaml:
+#   dvc metrics diff
+# ─────────────────────────────────────────────────────────────────────────────
+
+stages:
+
+  # ── Stage 1: Profile YOLO models ──────────────────────────────────────────
+  # Runs all three YOLOv8 variants over the COCO training split and records
+  # confidence, latency, and detection count per image into a CSV.
+  # Requires: Data-Pipeline data to be present (run Data-Pipeline/dvc repro first).
+  profile:
+    cmd: python training/profile_models.py
+    deps:
+      - training/profile_models.py
+      - ../../../Data-Pipeline/data/splits/train.txt
+    params:
+      - params.yaml:
+          - profile.device
+    outs:
+      - model_performance_profile.csv
+
+  # ── Stage 2: Train RL routing policy (Behavioral Cloning) ─────────────────
+  # Trains a supervised MLP classifier on (observation → optimal_action) labels
+  # derived from the profiling CSV, then injects weights into a PPO policy shell.
+  train:
+    cmd: python training/pretrain_bc.py
+    deps:
+      - training/pretrain_bc.py
+      - core/environment.py
+      - core/features.py
+      - model_performance_profile.csv
+    params:
+      - params.yaml:
+          - bc
+          - ppo
+          - reward
+          - paths
+    outs:
+      - models/PPO_v6/final_adaptive_model.zip
+      - models/PPO_v6/bc_init_model.zip
+
+  # ── Stage 3: Evaluate trained policy ──────────────────────────────────────
+  # Runs a 1000-step deterministic rollout and reports the action distribution
+  # and average reward. Fails if Nano or Large usage falls below 20%.
+  evaluate:
+    cmd: python training/evaluate_policy.py
+    deps:
+      - training/evaluate_policy.py
+      - core/environment.py
+      - model_performance_profile.csv
+      - models/PPO_v6/final_adaptive_model.zip
+    params:
+      - params.yaml:
+          - paths
+    metrics:
+      - metrics.json:
+          cache: false

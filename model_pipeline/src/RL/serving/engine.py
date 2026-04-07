@@ -34,7 +34,7 @@ import numpy as np
 from stable_baselines3 import PPO
 from ultralytics import YOLO
 
-from features import FeatureExtractor
+from core.features import FeatureExtractor
 
 MODEL_NAMES: List[str] = ["Nano", "Small", "Large"]
 
@@ -114,16 +114,11 @@ class AdaptiveInferenceSystem:
         self.prev_conf: float = 0.5
 
         # Decision throttling: re-evaluate the RL policy only every N frames.
-        # The selected model is reused for intermediate frames, amortising the
-        # cost of _build_obs() + agent.predict() across decision_interval frames.
         self.decision_interval: int = max(1, decision_interval)
         self._frame_count: int = 0
         self._current_action: int = 0
 
         # Warm up CUDA kernels on all three models.
-        # The first inference call on any CUDA model compiles kernels and
-        # allocates memory, causing a 300–600 ms spike. Running a dummy frame
-        # through each model here absorbs that cost before any timed inference.
         self._warmup()
 
         print("[Engine] Ready.")
@@ -135,35 +130,25 @@ class AdaptiveInferenceSystem:
             model(dummy, verbose=False, device=self.device)
         print("[Engine] Warm-up complete.")
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Internal helpers
-    # ──────────────────────────────────────────────────────────────────────────
-
     def _build_obs(self, frame: np.ndarray) -> np.ndarray:
         """
         Build the 1028-dim observation vector that matches the training
         environment (environment.py → _get_obs):
 
           [visual_feats (1024)] + [edge * 10.0 (1)] + [prev_action/2, prev_conf, 0.0 (3)]
-
-        Grayscale is computed once and reused for both visual features and edge
-        density, avoiding the redundant BGR→Gray conversion that the individual
-        FeatureExtractor methods each perform internally.
         """
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Visual features: resize to 32×32, normalise, flatten  (1024,)
         resized = cv2.resize(gray, (32, 32), interpolation=cv2.INTER_AREA)
         vis_feats = (resized.flatten() / 255.0).astype(np.float32)
 
-        # Edge density via Canny on the already-computed grayscale  (1,)
         edges = cv2.Canny(gray, 100, 200)
         edge_val = float(np.sum(edges > 0)) / (edges.shape[0] * edges.shape[1])
         scaled_edge = np.array([edge_val * 10.0], dtype=np.float32)
 
         metadata = np.array(
             [self.prev_action / 2.0, self.prev_conf, 0.0], dtype=np.float32
-        )                                                                          # (3,)
+        )
 
         return np.concatenate([vis_feats, scaled_edge, metadata]).astype(np.float32)
 
@@ -190,16 +175,12 @@ class AdaptiveInferenceSystem:
             avg_conf, count, detections = 0.0, 0, []
 
         return InferenceResult(
-            model_name="",        # caller sets this
+            model_name="",
             detections=detections,
             latency_ms=latency_ms,
             object_count=count,
             avg_confidence=avg_conf,
         )
-
-    # ──────────────────────────────────────────────────────────────────────────
-    # Public API
-    # ──────────────────────────────────────────────────────────────────────────
 
     def infer(self, frame: np.ndarray) -> Dict[str, Any]:
         """
@@ -207,17 +188,7 @@ class AdaptiveInferenceSystem:
 
         Path A — Adaptive: PPO agent selects the optimal YOLO variant.
         Path B — Baseline: always runs YOLOv8 Small.
-
-        Returns
-        -------
-        dict with keys "adaptive" and "baseline", each a serialisable dict
-        produced by InferenceResult.to_dict().
         """
-        # ── Path A: RL-adaptive ───────────────────────────────────────────────
-        # Re-run the RL policy only every `decision_interval` frames.
-        # On intermediate frames the previous action is reused, so the cost of
-        # _build_obs() + agent.predict() is paid once every N frames instead of
-        # every frame.
         self._frame_count += 1
         if self._frame_count % self.decision_interval == 1:
             obs = self._build_obs(frame)
@@ -229,11 +200,9 @@ class AdaptiveInferenceSystem:
         adaptive = self._run_yolo(self.models[action], frame)
         adaptive.model_name = MODEL_NAMES[action]
 
-        # Update state for the next frame's observation
         self.prev_action = action
         self.prev_conf = adaptive.avg_confidence
 
-        # ── Path B: Baseline (fixed Small) ───────────────────────────────────
         baseline = self._run_yolo(self.baseline_model, frame)
         baseline.model_name = "Small"
 

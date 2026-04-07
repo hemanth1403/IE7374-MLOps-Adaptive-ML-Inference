@@ -1,28 +1,74 @@
-# Use NVIDIA CUDA base image for GPU support
-FROM nvidia/cuda:12.1.0-base-ubuntu22.04
+# ─────────────────────────────────────────────────────────────────────────────
+# Adaptive ML Inference System — Production Container
+#
+# Base: nvidia/cuda:12.1.0-runtime-ubuntu22.04
+#   "runtime" includes libcudart needed by PyTorch without the full dev toolkit.
+#   Requires NVIDIA Container Toolkit on the host:
+#     https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
+#
+# Build (from model_pipeline/src/RL/):
+#   docker build -t adaptive-inference .
+#
+# Run FastAPI backend (GPU):
+#   docker run --gpus all -p 8000:8000 \
+#     -v $(pwd)/models:/app/models:ro \
+#     -v $(pwd)/yolov8n.pt:/app/yolov8n.pt:ro \
+#     -v $(pwd)/yolov8s.pt:/app/yolov8s.pt:ro \
+#     -v $(pwd)/yolov8l.pt:/app/yolov8l.pt:ro \
+#     adaptive-inference
+#
+# Run Streamlit dashboard (connect to a remote backend):
+#   docker run -p 8501:8501 \
+#     -e WS_URL=ws://<backend-host>:8000/ws/stream \
+#     adaptive-inference \
+#     streamlit run serving/ui.py --server.port=8501 --server.address=0.0.0.0
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Prevent interactive prompts during installation
-ENV DEBIAN_FRONTEND=noninteractive
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    python3.11 \
-    python3-pip \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    git \
+# ── System packages ───────────────────────────────────────────────────────────
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3.10 \
+        python3-pip \
+        python3.10-dev \
+        # OpenCV runtime dependencies
+        libgl1 \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender1 \
+        libgomp1 \
+        git \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+RUN ln -sf /usr/bin/python3.10 /usr/bin/python && \
+    ln -sf /usr/bin/pip3 /usr/bin/pip
+
+# ── NVIDIA container toolkit env hints ────────────────────────────────────────
+ENV NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# ── Python dependencies ───────────────────────────────────────────────────────
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip3 install --upgrade pip
-RUN pip3 install -r requirements.txt
+COPY requirements_deploy.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements_deploy.txt
 
-# Copy the rest of the application
-COPY . .
+# ── Application source ────────────────────────────────────────────────────────
+# Model weights (.pt / .zip) are large binaries — mount as read-only volumes
+# at runtime rather than baking into the image layer.
+COPY core/ ./core/
+COPY serving/ ./serving/
 
-# Default command
-CMD ["python3", "orchestrator.py"]
+# ── Ports ─────────────────────────────────────────────────────────────────────
+# 8000 — FastAPI / uvicorn
+# 8501 — Streamlit
+EXPOSE 8000 8501
+
+# ── Default: start the FastAPI inference server ───────────────────────────────
+CMD ["uvicorn", "serving.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

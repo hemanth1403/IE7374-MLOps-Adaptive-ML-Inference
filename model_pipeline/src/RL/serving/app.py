@@ -28,13 +28,22 @@ YOLO_N_PATH        yolov8n.pt        (default: yolov8n.pt)
 YOLO_S_PATH        yolov8s.pt        (default: yolov8s.pt)
 YOLO_L_PATH        yolov8l.pt        (default: yolov8l.pt)
 INFERENCE_DEVICE   cuda | cpu        (default: cuda)
+
+Run from the RL root directory:
+    uvicorn serving.app:app --host 0.0.0.0 --port 8000
 """
 
 from __future__ import annotations
 
+import sys
+import os
+# Ensure the RL root is on sys.path so package imports resolve correctly
+_RL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _RL_ROOT not in sys.path:
+    sys.path.insert(0, _RL_ROOT)
+
 import base64
 import json
-import os
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 
@@ -44,13 +53,13 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 # engine.py applies the PyTorch patch at import time — import before SB3/YOLO
-from engine import AdaptiveInferenceSystem
-from tracking import SessionTracker
+from serving.engine import AdaptiveInferenceSystem
+from serving.tracking import SessionTracker
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Configuration (via environment variables with sensible defaults)
 # ──────────────────────────────────────────────────────────────────────────────
-RL_MODEL_PATH = os.getenv("RL_MODEL_PATH", "models/PPO/final_adaptive_model.zip")
+RL_MODEL_PATH = os.getenv("RL_MODEL_PATH", "models/PPO_v6/final_adaptive_model.zip")
 YOLO_N_PATH   = os.getenv("YOLO_N_PATH",   "yolov8n.pt")
 YOLO_S_PATH   = os.getenv("YOLO_S_PATH",   "yolov8s.pt")
 YOLO_L_PATH   = os.getenv("YOLO_L_PATH",   "yolov8l.pt")

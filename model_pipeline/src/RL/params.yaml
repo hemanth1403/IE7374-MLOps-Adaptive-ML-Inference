@@ -1,0 +1,40 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# params.yaml — single source of truth for all tunable hyperparameters.
+# Changing any value here will cause `dvc repro` to re-run the affected stages.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Profiling ─────────────────────────────────────────────────────────────────
+profile:
+  device: cpu                # cpu | cuda  (cpu gives stable latency measurements)
+
+# ── Reward function (environment.py) ─────────────────────────────────────────
+reward:
+  w_quality: 0.84            # weight for quality  (conf × √count)
+  w_efficiency: 0.16         # weight for efficiency (quality / latency)
+  switching_penalty: 0.02    # penalty for switching model between steps
+  episode_length: 2048       # steps per training episode (random start each time)
+
+# ── Behavioral Cloning pre-training (pretrain_bc.py) ──────────────────────────
+bc:
+  sample_rows: 15000         # images sampled from CSV for BC training
+  epochs: 30                 # supervised training epochs
+  lr: 0.001                  # Adam learning rate
+  batch_size: 256            # mini-batch size
+  hidden_dim: 256            # MLP hidden layer width (two layers)
+
+# ── PPO fine-tuning (optional, after BC warm-start) ───────────────────────────
+ppo:
+  finetune_steps: 0          # 0 = skip fine-tuning (BC-only is the stable option)
+  learning_rate: 0.00005
+  ent_coef: 0.02
+  n_steps: 2048
+  batch_size: 64
+  device: cpu
+
+# ── Output paths ──────────────────────────────────────────────────────────────
+paths:
+  profile_csv: model_performance_profile.csv
+  model_dir: models/PPO_v6
+  final_model: models/PPO_v6/final_adaptive_model.zip
+  metrics: metrics.json
+  log_dir: logs

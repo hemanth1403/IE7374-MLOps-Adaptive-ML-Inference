@@ -1,0 +1,31 @@
+# Adaptive ML Inference — deployment dependencies
+# Install with: pip install -r requirements_deploy.txt
+
+# ── Deep learning ─────────────────────────────────────────────────────────────
+torch>=2.1.0
+torchvision
+
+# ── YOLO & RL ─────────────────────────────────────────────────────────────────
+ultralytics>=8.0.0
+stable-baselines3>=2.0.0
+shimmy>=1.0.0          # SB3 compatibility shim for Gymnasium
+gymnasium>=0.29.0
+
+# ── Backend ───────────────────────────────────────────────────────────────────
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0        # async WS support used by uvicorn/starlette
+websocket-client>=1.6.0 # synchronous client used by ui.py
+
+# ── Computer vision ───────────────────────────────────────────────────────────
+opencv-python-headless>=4.8.0   # headless: no GUI deps (server / container)
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+streamlit>=1.28.0
+
+# ── MLOps tracking ────────────────────────────────────────────────────────────
+mlflow>=2.8.0
+
+# ── Data ──────────────────────────────────────────────────────────────────────
+numpy>=1.24.0
+pandas>=2.0.0
