@@ -6,6 +6,7 @@ cmd.txt
 model_pipeline/src/RL/trash.py
 model_pipeline/src/RL/SampleImage.png
 model_pipeline/src/RL/__pycache__
+model_pipeline/src/RL/RUN_LOCALLY.md
 
 # pipeline data (now under Data-Pipeline/)
 Data-Pipeline/data/
@@ -37,7 +38,7 @@ model_pipeline/reports/*
 !model_pipeline/reports/.gitkeep
 model_pipeline/src/YOLO_Models
 model_pipeline/src/RL/models	
-model_pipeline/src/RL/RUN_LOCALLY.md
+
 
 yolov8n.pt
 yolov8s.pt
