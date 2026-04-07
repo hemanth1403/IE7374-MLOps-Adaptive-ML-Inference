@@ -1,0 +1,10 @@
+model_name,slice,num_images,avg_latency_ms,throughput_fps,latency_gap_pct,throughput_gap_pct,latency_flag,throughput_flag,bias_flag
+yolo_large,simple,10,441.5691,2.2647,9.12,-8.36,False,False,False
+yolo_large,moderate,10,426.0835,2.347,5.3,-5.03,False,False,False
+yolo_large,complex,10,404.6514,2.4713,0.0,0.0,False,False,False
+yolo_nano,simple,10,66.0292,15.1448,1.82,-1.78,False,False,False
+yolo_nano,moderate,10,64.8514,15.4199,0.0,0.0,False,False,False
+yolo_nano,complex,10,71.6668,13.9535,10.51,-9.51,False,False,False
+yolo_small,simple,10,123.8605,8.0736,1.91,-1.87,False,False,False
+yolo_small,moderate,10,121.5394,8.2278,0.0,0.0,False,False,False
+yolo_small,complex,10,125.8387,7.9467,3.54,-3.42,False,False,False

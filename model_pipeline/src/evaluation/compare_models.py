@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import yaml
+import mlflow
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -29,6 +30,8 @@ def main() -> None:
     benchmark_dir = REPO_ROOT / eval_cfg["outputs"]["benchmark_dir"]
     figures_dir = REPO_ROOT / eval_cfg["outputs"]["figures_dir"]
     figures_dir.mkdir(parents=True, exist_ok=True)
+
+    mlflow.set_experiment("pretrained_yolo_summary")
 
     summary = []
 
@@ -73,8 +76,11 @@ def main() -> None:
     with out_path.open("w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
-    print(f"Saved comparison summary to {out_path}")
+    with mlflow.start_run(run_name="model_comparison_summary"):
+        mlflow.log_param("num_models", len(summary))
+        mlflow.log_artifact(str(out_path), artifact_path="summaries")
 
+    print(f"Saved comparison summary to {out_path}")
 
 if __name__ == "__main__":
     main()

@@ -5,6 +5,7 @@ if _RL_ROOT not in sys.path:
     sys.path.insert(0, _RL_ROOT)
 
 import cv2
+from pathlib import Path
 
 def test_image_loading():
     # Climb from RL root to project root

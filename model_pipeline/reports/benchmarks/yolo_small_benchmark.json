@@ -1,0 +1,250 @@
+{
+  "model_name": "yolo_small",
+  "weights_source": "yolov8s.pt",
+  "device": "cpu",
+  "benchmark_config": {
+    "split_name": "train",
+    "per_bucket": 10,
+    "bucket_definition": {
+      "simple": "<=2 objects",
+      "moderate": "3-7 objects",
+      "complex": ">=8 objects"
+    }
+  },
+  "summary": {
+    "overall": {
+      "num_images": 30,
+      "avg_latency_ms": 123.7461999990046,
+      "throughput_fps": 8.081056226438015
+    },
+    "by_bucket": {
+      "complex": {
+        "num_images": 10,
+        "avg_latency_ms": 125.83867001812905,
+        "throughput_fps": 7.946682842848976
+      },
+      "moderate": {
+        "num_images": 10,
+        "avg_latency_ms": 121.53941004071385,
+        "throughput_fps": 8.227783890550525
+      },
+      "simple": {
+        "num_images": 10,
+        "avg_latency_ms": 123.86051993817091,
+        "throughput_fps": 8.073597628196485
+      }
+    }
+  },
+  "per_image_results": [
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000200807.jpg",
+      "object_count": 2,
+      "bucket": "simple",
+      "elapsed_sec": 0.11490589985623956,
+      "latency_ms": 114.90589985623956
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000001397.jpg",
+      "object_count": 2,
+      "bucket": "simple",
+      "elapsed_sec": 0.12056330009363592,
+      "latency_ms": 120.56330009363592
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000079047.jpg",
+      "object_count": 2,
+      "bucket": "simple",
+      "elapsed_sec": 0.13084149989299476,
+      "latency_ms": 130.84149989299476
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000398388.jpg",
+      "object_count": 1,
+      "bucket": "simple",
+      "elapsed_sec": 0.12196479993872344,
+      "latency_ms": 121.96479993872344
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000226034.jpg",
+      "object_count": 1,
+      "bucket": "simple",
+      "elapsed_sec": 0.11631820001639426,
+      "latency_ms": 116.31820001639426
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000257663.jpg",
+      "object_count": 2,
+      "bucket": "simple",
+      "elapsed_sec": 0.1222212000284344,
+      "latency_ms": 122.2212000284344
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000002931.jpg",
+      "object_count": 1,
+      "bucket": "simple",
+      "elapsed_sec": 0.1572832998353988,
+      "latency_ms": 157.2832998353988
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000461759.jpg",
+      "object_count": 1,
+      "bucket": "simple",
+      "elapsed_sec": 0.11474569980055094,
+      "latency_ms": 114.74569980055094
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000547896.jpg",
+      "object_count": 1,
+      "bucket": "simple",
+      "elapsed_sec": 0.12030719988979399,
+      "latency_ms": 120.30719988979399
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000078652.jpg",
+      "object_count": 2,
+      "bucket": "simple",
+      "elapsed_sec": 0.11945410002954304,
+      "latency_ms": 119.45410002954304
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000053455.jpg",
+      "object_count": 4,
+      "bucket": "moderate",
+      "elapsed_sec": 0.11906450008973479,
+      "latency_ms": 119.06450008973479
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000113716.jpg",
+      "object_count": 4,
+      "bucket": "moderate",
+      "elapsed_sec": 0.11889799986965954,
+      "latency_ms": 118.89799986965954
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000162283.jpg",
+      "object_count": 3,
+      "bucket": "moderate",
+      "elapsed_sec": 0.1205848001409322,
+      "latency_ms": 120.5848001409322
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000546210.jpg",
+      "object_count": 4,
+      "bucket": "moderate",
+      "elapsed_sec": 0.11426760000176728,
+      "latency_ms": 114.26760000176728
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000201903.jpg",
+      "object_count": 5,
+      "bucket": "moderate",
+      "elapsed_sec": 0.11559709999710321,
+      "latency_ms": 115.59709999710321
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000052290.jpg",
+      "object_count": 3,
+      "bucket": "moderate",
+      "elapsed_sec": 0.12053630012087524,
+      "latency_ms": 120.53630012087524
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000130518.jpg",
+      "object_count": 6,
+      "bucket": "moderate",
+      "elapsed_sec": 0.11807020008563995,
+      "latency_ms": 118.07020008563995
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000301753.jpg",
+      "object_count": 5,
+      "bucket": "moderate",
+      "elapsed_sec": 0.12213190016336739,
+      "latency_ms": 122.13190016336739
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000205573.jpg",
+      "object_count": 7,
+      "bucket": "moderate",
+      "elapsed_sec": 0.13614120008423924,
+      "latency_ms": 136.14120008423924
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000402569.jpg",
+      "object_count": 6,
+      "bucket": "moderate",
+      "elapsed_sec": 0.1301024998538196,
+      "latency_ms": 130.1024998538196
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000570255.jpg",
+      "object_count": 13,
+      "bucket": "complex",
+      "elapsed_sec": 0.11676460015587509,
+      "latency_ms": 116.76460015587509
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000123810.jpg",
+      "object_count": 8,
+      "bucket": "complex",
+      "elapsed_sec": 0.12870190013200045,
+      "latency_ms": 128.70190013200045
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000093789.jpg",
+      "object_count": 8,
+      "bucket": "complex",
+      "elapsed_sec": 0.12642600014805794,
+      "latency_ms": 126.42600014805794
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000555322.jpg",
+      "object_count": 8,
+      "bucket": "complex",
+      "elapsed_sec": 0.12573860003612936,
+      "latency_ms": 125.73860003612936
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000072397.jpg",
+      "object_count": 14,
+      "bucket": "complex",
+      "elapsed_sec": 0.1311785001307726,
+      "latency_ms": 131.1785001307726
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000290690.jpg",
+      "object_count": 15,
+      "bucket": "complex",
+      "elapsed_sec": 0.13179160002619028,
+      "latency_ms": 131.79160002619028
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000262715.jpg",
+      "object_count": 15,
+      "bucket": "complex",
+      "elapsed_sec": 0.11820869985967875,
+      "latency_ms": 118.20869985967875
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000040961.jpg",
+      "object_count": 13,
+      "bucket": "complex",
+      "elapsed_sec": 0.12409839988686144,
+      "latency_ms": 124.09839988686144
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000247438.jpg",
+      "object_count": 9,
+      "bucket": "complex",
+      "elapsed_sec": 0.12745489994995296,
+      "latency_ms": 127.45489994995296
+    },
+    {
+      "image_path": "C:\\IE7374\\Project\\Data-Pipeline\\data\\processed\\images\\train2017\\000000211186.jpg",
+      "object_count": 15,
+      "bucket": "complex",
+      "elapsed_sec": 0.12802349985577166,
+      "latency_ms": 128.02349985577166
+    }
+  ]
+}

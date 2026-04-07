@@ -1,0 +1,50 @@
+[
+  {
+    "model_name": "yolo_large",
+    "weights_source": "yolov8l.pt",
+    "mAP50": 0.6945764789068026,
+    "mAP50_95": 0.5294227817505908,
+    "precision": 0.7401373571316784,
+    "recall": 0.633619364172817,
+    "overall_avg_latency_ms": 424.1013166649888,
+    "overall_throughput_fps": 2.357927128978786,
+    "simple_avg_latency_ms": 441.5690500289202,
+    "moderate_avg_latency_ms": 426.0835099965334,
+    "complex_avg_latency_ms": 404.6513899695128,
+    "simple_throughput_fps": 2.2646514739529544,
+    "moderate_throughput_fps": 2.3469577595437476,
+    "complex_throughput_fps": 2.4712629804023205
+  },
+  {
+    "model_name": "yolo_nano",
+    "weights_source": "yolov8n.pt",
+    "mAP50": 0.5208982045538624,
+    "mAP50_95": 0.37097950193319557,
+    "precision": 0.6330846044642237,
+    "recall": 0.47497498241482405,
+    "overall_avg_latency_ms": 67.51581003579001,
+    "overall_throughput_fps": 14.811345660666767,
+    "simple_avg_latency_ms": 66.02921003941447,
+    "moderate_avg_latency_ms": 64.85140004660934,
+    "complex_avg_latency_ms": 71.66682002134621,
+    "simple_throughput_fps": 15.144812415642642,
+    "moderate_throughput_fps": 15.419867563094861,
+    "complex_throughput_fps": 13.953458514025689
+  },
+  {
+    "model_name": "yolo_small",
+    "weights_source": "yolov8s.pt",
+    "mAP50": 0.6130503809361277,
+    "mAP50_95": 0.44741244889844567,
+    "precision": 0.6821979425630877,
+    "recall": 0.5628688531245153,
+    "overall_avg_latency_ms": 123.7461999990046,
+    "overall_throughput_fps": 8.081056226438015,
+    "simple_avg_latency_ms": 123.86051993817091,
+    "moderate_avg_latency_ms": 121.53941004071385,
+    "complex_avg_latency_ms": 125.83867001812905,
+    "simple_throughput_fps": 8.073597628196485,
+    "moderate_throughput_fps": 8.227783890550525,
+    "complex_throughput_fps": 7.946682842848976
+  }
+]

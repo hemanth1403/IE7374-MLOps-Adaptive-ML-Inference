@@ -36,24 +36,3 @@ class RewardCalculator:
         total_reward = acc_reward - lat_penalty - switch_penalty
         
         return total_reward
-    
-
-########################################
-
-
-
-# Strategic Tuning Guide
-# As you move into the implementation phase, you'll need to "find the sweet spot" for your weights:
-# 
-# To prioritize the 95% Accuracy goal: 
-# Increase the penalty for accuracy dropping below 0.90. 
-# This forces the agent to use YOLOv8-Large as soon as the scene gets even slightly complex.
-# 
-# 
-# To prioritize the 58% Latency reduction: 
-# Increase $\alpha$. The agent will become "braver" and try to use YOLOv8-Nano even in moderately complex scenes to avoid the high latency cost.
-# 
-# 
-# To fix "Control Chatter": 
-# If you notice the system switching models every few seconds in your tests, increase $\beta$. 
-# This makes the "cost" of switching higher than the gain in accuracy or speed.

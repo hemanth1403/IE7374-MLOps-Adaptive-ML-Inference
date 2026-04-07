@@ -1,4 +1,5 @@
 .venv/
+.venv-rl/
 .pytest_cache/
 logs/
 cmd.txt
@@ -12,6 +13,8 @@ Data-Pipeline/.dvc/cache/
 Data-Pipeline/.dvc/tmp/
 Data-Pipeline/.pytest_cache/
 Data-Pipeline/logs/
+Data-Pipeline/keys/
+Data-Pipeline/.dvc/config.local
 
 # DVC cache
 .dvc/cache/

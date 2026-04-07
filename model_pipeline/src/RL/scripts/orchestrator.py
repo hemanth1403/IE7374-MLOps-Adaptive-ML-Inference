@@ -5,6 +5,7 @@ if _RL_ROOT not in sys.path:
     sys.path.insert(0, _RL_ROOT)
 
 import cv2
+import time
 import torch
 from ultralytics import YOLO
 from core.features import FeatureExtractor
@@ -57,6 +58,7 @@ class MLOpsOrchestrator:
                 self.buffer.reset_window()
 
         cap.release()
+        return metrics
 
 if __name__ == "__main__":
     orchestrator = MLOpsOrchestrator(window_size=10)

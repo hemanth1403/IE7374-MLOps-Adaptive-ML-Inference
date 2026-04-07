@@ -1,0 +1,92 @@
+{
+  "models": {
+    "yolo_large": {
+      "simple": {
+        "model_name": "yolo_large",
+        "weights_source": "yolov8l.pt",
+        "complexity_bucket": "simple",
+        "num_images": 10,
+        "avg_latency_ms": 441.5690500289202,
+        "throughput_fps": 2.2646514739529544
+      },
+      "moderate": {
+        "model_name": "yolo_large",
+        "weights_source": "yolov8l.pt",
+        "complexity_bucket": "moderate",
+        "num_images": 10,
+        "avg_latency_ms": 426.0835099965334,
+        "throughput_fps": 2.3469577595437476
+      },
+      "complex": {
+        "model_name": "yolo_large",
+        "weights_source": "yolov8l.pt",
+        "complexity_bucket": "complex",
+        "num_images": 10,
+        "avg_latency_ms": 404.6513899695128,
+        "throughput_fps": 2.4712629804023205
+      }
+    },
+    "yolo_nano": {
+      "simple": {
+        "model_name": "yolo_nano",
+        "weights_source": "yolov8n.pt",
+        "complexity_bucket": "simple",
+        "num_images": 10,
+        "avg_latency_ms": 66.02921003941447,
+        "throughput_fps": 15.144812415642642
+      },
+      "moderate": {
+        "model_name": "yolo_nano",
+        "weights_source": "yolov8n.pt",
+        "complexity_bucket": "moderate",
+        "num_images": 10,
+        "avg_latency_ms": 64.85140004660934,
+        "throughput_fps": 15.419867563094861
+      },
+      "complex": {
+        "model_name": "yolo_nano",
+        "weights_source": "yolov8n.pt",
+        "complexity_bucket": "complex",
+        "num_images": 10,
+        "avg_latency_ms": 71.66682002134621,
+        "throughput_fps": 13.953458514025689
+      }
+    },
+    "yolo_small": {
+      "simple": {
+        "model_name": "yolo_small",
+        "weights_source": "yolov8s.pt",
+        "complexity_bucket": "simple",
+        "num_images": 10,
+        "avg_latency_ms": 123.86051993817091,
+        "throughput_fps": 8.073597628196485
+      },
+      "moderate": {
+        "model_name": "yolo_small",
+        "weights_source": "yolov8s.pt",
+        "complexity_bucket": "moderate",
+        "num_images": 10,
+        "avg_latency_ms": 121.53941004071385,
+        "throughput_fps": 8.227783890550525
+      },
+      "complex": {
+        "model_name": "yolo_small",
+        "weights_source": "yolov8s.pt",
+        "complexity_bucket": "complex",
+        "num_images": 10,
+        "avg_latency_ms": 125.83867001812905,
+        "throughput_fps": 7.946682842848976
+      }
+    }
+  },
+  "buckets": [
+    "simple",
+    "moderate",
+    "complex"
+  ],
+  "notes": {
+    "simple": "<=2 objects",
+    "moderate": "3-7 objects",
+    "complex": ">=8 objects"
+  }
+}

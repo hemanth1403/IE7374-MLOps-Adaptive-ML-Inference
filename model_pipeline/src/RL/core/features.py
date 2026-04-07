@@ -39,29 +39,3 @@ class FeatureExtractor:
         # Concatenate everything into a single 1027-length vector
         state = np.concatenate([visual_vec, edge_val, metadata])
         return state
-
-# --- Usage Example ---
-# extractor = FeatureExtractor()
-# vis_vec = extractor.get_visual_features(raw_frame)
-# edge_val = extractor.get_edge_density(raw_frame)
-# full_state = extractor.construct_state(vis_vec, edge_val, [0, 0.85, 2])
-
-
-
-###########################
-
-
-# Why these specific features?  
-
-# 32x32 Grayscale: 
-# This captures the "blobbiness" of a scene. 
-# If the frame is mostly a gray road, the RL agent learns that's "simple." 
-# If there are many high-contrast shapes, it's "complex."
-
-# Canny Edge Density: 
-# This is a classic "cheap" computer vision trick. 
-# More edges almost always mean more objects or a busier background, which is a strong signal that you might need YOLOv8-Large.
-
-# Float32 Precision: 
-# We use np.float32 because neural networks (which we'll build in agent.py) are optimized for 32-bit floats. 
-# Using 64-bit would just double your memory usage for no gain in accuracy.

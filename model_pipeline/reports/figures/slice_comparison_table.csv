@@ -1,0 +1,10 @@
+model_name,weights_source,complexity_bucket,num_images,avg_latency_ms,throughput_fps
+yolo_large,yolov8l.pt,simple,10,441.5690500289202,2.2646514739529544
+yolo_large,yolov8l.pt,moderate,10,426.0835099965334,2.3469577595437476
+yolo_large,yolov8l.pt,complex,10,404.6513899695128,2.4712629804023205
+yolo_nano,yolov8n.pt,simple,10,66.02921003941447,15.144812415642642
+yolo_nano,yolov8n.pt,moderate,10,64.85140004660934,15.419867563094861
+yolo_nano,yolov8n.pt,complex,10,71.66682002134621,13.953458514025689
+yolo_small,yolov8s.pt,simple,10,123.86051993817091,8.073597628196485
+yolo_small,yolov8s.pt,moderate,10,121.53941004071385,8.227783890550525
+yolo_small,yolov8s.pt,complex,10,125.83867001812905,7.946682842848976

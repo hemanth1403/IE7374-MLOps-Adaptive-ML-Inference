@@ -1,0 +1,139 @@
+{
+  "slice_definitions": {
+    "simple": "<=2 objects",
+    "moderate": "3-7 objects",
+    "complex": ">=8 objects"
+  },
+  "thresholds": {
+    "latency_gap_flag_pct": 100.0,
+    "throughput_gap_flag_pct": -50.0
+  },
+  "models": {
+    "yolo_large": {
+      "best_latency_ms": 404.6513899695128,
+      "best_throughput_fps": 2.4712629804023205,
+      "slices": {
+        "simple": {
+          "model_name": "yolo_large",
+          "slice": "simple",
+          "num_images": 10,
+          "avg_latency_ms": 441.5691,
+          "throughput_fps": 2.2647,
+          "latency_gap_pct": 9.12,
+          "throughput_gap_pct": -8.36,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "moderate": {
+          "model_name": "yolo_large",
+          "slice": "moderate",
+          "num_images": 10,
+          "avg_latency_ms": 426.0835,
+          "throughput_fps": 2.347,
+          "latency_gap_pct": 5.3,
+          "throughput_gap_pct": -5.03,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "complex": {
+          "model_name": "yolo_large",
+          "slice": "complex",
+          "num_images": 10,
+          "avg_latency_ms": 404.6514,
+          "throughput_fps": 2.4713,
+          "latency_gap_pct": 0.0,
+          "throughput_gap_pct": 0.0,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        }
+      }
+    },
+    "yolo_nano": {
+      "best_latency_ms": 64.85140004660934,
+      "best_throughput_fps": 15.419867563094861,
+      "slices": {
+        "simple": {
+          "model_name": "yolo_nano",
+          "slice": "simple",
+          "num_images": 10,
+          "avg_latency_ms": 66.0292,
+          "throughput_fps": 15.1448,
+          "latency_gap_pct": 1.82,
+          "throughput_gap_pct": -1.78,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "moderate": {
+          "model_name": "yolo_nano",
+          "slice": "moderate",
+          "num_images": 10,
+          "avg_latency_ms": 64.8514,
+          "throughput_fps": 15.4199,
+          "latency_gap_pct": 0.0,
+          "throughput_gap_pct": 0.0,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "complex": {
+          "model_name": "yolo_nano",
+          "slice": "complex",
+          "num_images": 10,
+          "avg_latency_ms": 71.6668,
+          "throughput_fps": 13.9535,
+          "latency_gap_pct": 10.51,
+          "throughput_gap_pct": -9.51,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        }
+      }
+    },
+    "yolo_small": {
+      "best_latency_ms": 121.53941004071385,
+      "best_throughput_fps": 8.227783890550525,
+      "slices": {
+        "simple": {
+          "model_name": "yolo_small",
+          "slice": "simple",
+          "num_images": 10,
+          "avg_latency_ms": 123.8605,
+          "throughput_fps": 8.0736,
+          "latency_gap_pct": 1.91,
+          "throughput_gap_pct": -1.87,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "moderate": {
+          "model_name": "yolo_small",
+          "slice": "moderate",
+          "num_images": 10,
+          "avg_latency_ms": 121.5394,
+          "throughput_fps": 8.2278,
+          "latency_gap_pct": 0.0,
+          "throughput_gap_pct": 0.0,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        },
+        "complex": {
+          "model_name": "yolo_small",
+          "slice": "complex",
+          "num_images": 10,
+          "avg_latency_ms": 125.8387,
+          "throughput_fps": 7.9467,
+          "latency_gap_pct": 3.54,
+          "throughput_gap_pct": -3.42,
+          "latency_flag": false,
+          "throughput_flag": false,
+          "bias_flag": false
+        }
+      }
+    }
+  }
+}
