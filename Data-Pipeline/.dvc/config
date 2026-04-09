@@ -3,3 +3,5 @@
     remote = origin
 ['remote "origin"']
     url = gs://dvcmlopsbucket
+['remote "model_pipeline"']
+    url = gs://modelpipelinerl

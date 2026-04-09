@@ -7,6 +7,7 @@ model_pipeline/src/RL/trash.py
 model_pipeline/src/RL/SampleImage.png
 model_pipeline/src/RL/__pycache__
 model_pipeline/src/RL/RUN_LOCALLY.md
+model_pipeline/keys/
 
 # pipeline data (now under Data-Pipeline/)
 Data-Pipeline/data/
