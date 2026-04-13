@@ -27,6 +27,7 @@ import json
 import os
 from typing import Any, Dict, List
 
+import altair as alt
 import cv2
 import numpy as np
 import pandas as pd
@@ -103,12 +104,18 @@ st.set_page_config(
 # Static layout — placeholders updated in-place during the streaming loop
 # ──────────────────────────────────────────────────────────────────────────────
 st.title("Adaptive ML Inference — Live Dashboard")
-st.caption(
-    "Path A uses the PPO RL agent to dynamically route frames to the optimal "
-    "YOLOv8 variant. Path B always uses YOLOv8-Small as a fixed baseline."
-)
 
 run: bool = st.toggle("Start Stream", value=False)
+baseline_choice: str = st.selectbox(
+    "Baseline model (Path B)",
+    ["Nano", "Small", "Large"],
+    index=1,
+    disabled=run,
+)
+st.caption(
+    "Path A uses the PPO RL agent to dynamically route frames to the optimal "
+    f"YOLOv8 variant. Path B uses YOLOv8-{baseline_choice} as a fixed baseline."
+)
 
 # ── Video feeds ───────────────────────────────────────────────────────────────
 col_l, col_r = st.columns(2)
@@ -122,7 +129,7 @@ with col_l:
     ph_conf_l  = pm_col3.empty()
 
 with col_r:
-    st.subheader("Path B — Baseline (YOLOv8-Small)")
+    st.subheader(f"Path B — Baseline (YOLOv8-{baseline_choice})")
     feed_r = st.empty()
     pb_col1, pb_col2, pb_col3 = st.columns(3)
     ph_model_r = pb_col1.empty()
@@ -183,7 +190,7 @@ if run:
             # Encode frame → base64 JPEG → send to FastAPI WS
             _, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
             b64 = base64.b64encode(jpeg.tobytes()).decode()
-            ws_conn.send(b64)
+            ws_conn.send(json.dumps({"frame": b64, "baseline_model": baseline_choice}))
 
             raw = ws_conn.recv()
             result = json.loads(raw)
@@ -250,14 +257,43 @@ if run:
                 adaptive_confs.pop(0)
                 baseline_confs.pop(0)
 
-            # ── Latency chart ─────────────────────────────────────────────────
-            ph_lat_chart.line_chart(
-                pd.DataFrame({"Adaptive": adaptive_lats, "Baseline": baseline_lats})
+            # ── Charts — Altair so Baseline is dashed and Adaptive solid,
+            #            keeping both distinguishable even when values are equal ─
+            _color_scale = alt.Scale(
+                domain=["Baseline", "Adaptive"],
+                range=["#1f77b4", "#FF6B35"],
+            )
+            _dash_scale = alt.Scale(
+                domain=["Baseline", "Adaptive"],
+                range=[[6, 4], [0, 0]],   # Baseline dashed, Adaptive solid
             )
 
-            # ── Confidence chart ──────────────────────────────────────────────
-            ph_conf_chart.line_chart(
-                pd.DataFrame({"Adaptive": adaptive_confs, "Baseline": baseline_confs})
+            frames = list(range(len(adaptive_lats)))
+
+            lat_df = pd.DataFrame(
+                {"frame": frames, "Adaptive": adaptive_lats, "Baseline": baseline_lats}
+            ).melt("frame", var_name="Series", value_name="Latency (ms)")
+            ph_lat_chart.altair_chart(
+                alt.Chart(lat_df).mark_line().encode(
+                    x=alt.X("frame:Q", axis=alt.Axis(title=None, labels=False)),
+                    y=alt.Y("Latency (ms):Q"),
+                    color=alt.Color("Series:N", scale=_color_scale),
+                    strokeDash=alt.StrokeDash("Series:N", scale=_dash_scale),
+                ),
+                use_container_width=True,
+            )
+
+            conf_df = pd.DataFrame(
+                {"frame": frames, "Adaptive": adaptive_confs, "Baseline": baseline_confs}
+            ).melt("frame", var_name="Series", value_name="Confidence")
+            ph_conf_chart.altair_chart(
+                alt.Chart(conf_df).mark_line().encode(
+                    x=alt.X("frame:Q", axis=alt.Axis(title=None, labels=False)),
+                    y=alt.Y("Confidence:Q"),
+                    color=alt.Color("Series:N", scale=_color_scale),
+                    strokeDash=alt.StrokeDash("Series:N", scale=_dash_scale),
+                ),
+                use_container_width=True,
             )
 
     finally:

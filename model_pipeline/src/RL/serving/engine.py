@@ -106,9 +106,6 @@ class AdaptiveInferenceSystem:
             YOLO(yolo_l_path).to(device),
         ]
 
-        # Index 1 (Small) is the fixed baseline
-        self.baseline_model: YOLO = self.models[1]
-
         # RL state — must be reset between independent sessions
         self.prev_action: int = 0
         self.prev_conf: float = 0.5
@@ -182,12 +179,12 @@ class AdaptiveInferenceSystem:
             avg_confidence=avg_conf,
         )
 
-    def infer(self, frame: np.ndarray) -> Dict[str, Any]:
+    def infer(self, frame: np.ndarray, baseline_model_name: str = "Small") -> Dict[str, Any]:
         """
         Dual-path inference on a single BGR frame.
 
         Path A — Adaptive: PPO agent selects the optimal YOLO variant.
-        Path B — Baseline: always runs YOLOv8 Small.
+        Path B — Baseline: runs the model specified by baseline_model_name.
         """
         self._frame_count += 1
         if self._frame_count % self.decision_interval == 1:
@@ -203,8 +200,10 @@ class AdaptiveInferenceSystem:
         self.prev_action = action
         self.prev_conf = adaptive.avg_confidence
 
-        baseline = self._run_yolo(self.baseline_model, frame)
-        baseline.model_name = "Small"
+        _baseline_index = {"Nano": 0, "Small": 1, "Large": 2}
+        baseline_idx = _baseline_index.get(baseline_model_name, 1)
+        baseline = self._run_yolo(self.models[baseline_idx], frame)
+        baseline.model_name = baseline_model_name
 
         return {"adaptive": adaptive.to_dict(), "baseline": baseline.to_dict()}
 

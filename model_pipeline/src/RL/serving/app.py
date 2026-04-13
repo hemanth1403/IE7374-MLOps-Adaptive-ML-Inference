@@ -8,7 +8,7 @@ WS   /ws/stream       — streaming inference over WebSocket
 
 WebSocket protocol
 ------------------
-Client → Server : raw base64-encoded JPEG frame (no data-URL prefix)
+Client → Server : JSON  {"frame": "<base64 JPEG>", "baseline_model": "Nano"|"Small"|"Large"}
 Server → Client : JSON packet:
     {
         "adaptive": {
@@ -140,12 +140,20 @@ async def stream(websocket: WebSocket) -> None:
         while True:
             raw = await websocket.receive_text()
 
-            frame = _decode_frame(raw)
+            try:
+                payload = json.loads(raw)
+                b64_frame = payload["frame"]
+                baseline_model_name = payload.get("baseline_model", "Small")
+            except (json.JSONDecodeError, KeyError):
+                b64_frame = raw
+                baseline_model_name = "Small"
+
+            frame = _decode_frame(b64_frame)
             if frame is None:
                 await websocket.send_text(_error("Could not decode frame"))
                 continue
 
-            result = _engine.infer(frame)
+            result = _engine.infer(frame, baseline_model_name=baseline_model_name)
             tracker.record(result)
 
             await websocket.send_text(json.dumps(result))
