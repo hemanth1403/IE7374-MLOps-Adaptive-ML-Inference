@@ -17,9 +17,9 @@ on:
         default: "latest"
 
 env:
-  GCP_PROJECT_ID: rl-orchestration-project
+  GCP_PROJECT_ID: adaptive-ml-inference
   GKE_CLUSTER: adaptive-inference-cluster
-  GKE_ZONE: us-central1-a
+  GKE_ZONE: europe-west1-b
   NAMESPACE: adaptive-inference
   # Image built by rl-docker.yml
   IMAGE: ghcr.io/${{ github.repository }}/adaptive-inference
