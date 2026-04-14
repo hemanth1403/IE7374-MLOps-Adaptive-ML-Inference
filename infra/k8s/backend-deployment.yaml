@@ -1,8 +1,11 @@
-# FastAPI inference backend — GPU node, single replica (GPU constraint).
+# FastAPI inference backend — CPU mode (GPU node pool not yet provisioned).
 # Probe timeline on a cold start:
-#   startupProbe  : tries every 5s for up to 10 min (GPU warmup + 3 YOLO loads)
+#   startupProbe  : tries every 5s for up to 10 min (model loading)
 #   readinessProbe: starts after startupProbe succeeds, gates traffic
 #   livenessProbe : runs throughout; restarts pod on repeated failure
+#
+# To enable GPU: add a GPU node pool, uncomment nodeSelector + tolerations,
+# and restore nvidia.com/gpu resource requests. Set INFERENCE_DEVICE=cuda.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,19 +29,17 @@ spec:
     spec:
       terminationGracePeriodSeconds: 60
 
-      # Schedule on the GPU node pool
-      nodeSelector:
-        cloud.google.com/gke-accelerator: nvidia-tesla-t4
-
-      tolerations:
-        - key: nvidia.com/gpu
-          operator: Exists
-          effect: NoSchedule
+      # GPU node pool not yet provisioned — running on CPU.
+      # Uncomment when GPU node pool is added:
+      # nodeSelector:
+      #   cloud.google.com/gke-accelerator: nvidia-tesla-t4
+      # tolerations:
+      #   - key: nvidia.com/gpu
+      #     operator: Exists
+      #     effect: NoSchedule
 
       containers:
         - name: adaptive-inference
-          # Image is built and pushed by .github/workflows/rl-docker.yml
-          # Replace <OWNER> with your GitHub org/user
           image: ghcr.io/hemanth1403/ie7374-mlops-adaptive-ml-inference/adaptive-inference:latest
           imagePullPolicy: Always
 
@@ -54,26 +55,24 @@ spec:
 
           resources:
             requests:
+              cpu: "1"
+              memory: "4Gi"
+            limits:
               cpu: "2"
               memory: "8Gi"
-              nvidia.com/gpu: "1"
-            limits:
-              cpu: "4"
-              memory: "16Gi"
-              nvidia.com/gpu: "1"
 
           volumeMounts:
             - name: model-weights
               mountPath: /app/models
 
-          # Startup probe: waits for GPU warmup (up to 10 minutes)
+          # Startup probe: waits for model loading (up to 10 minutes)
           startupProbe:
             httpGet:
               path: /health/startup
               port: 8000
             initialDelaySeconds: 0
             periodSeconds: 5
-            failureThreshold: 120   # 120 × 5s = 10 minutes max
+            failureThreshold: 120
 
           # Readiness probe: gates traffic; fails during SIGTERM drain
           readinessProbe:
@@ -97,7 +96,3 @@ spec:
         - name: model-weights
           persistentVolumeClaim:
             claimName: model-weights-pvc
-
-      # Pull from GHCR (set up imagePullSecrets if repo is private)
-      # imagePullSecrets:
-      #   - name: ghcr-credentials

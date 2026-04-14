@@ -21,8 +21,8 @@ env:
   GKE_CLUSTER: adaptive-inference-cluster
   GKE_ZONE: europe-west1-b
   NAMESPACE: adaptive-inference
-  # Image built by rl-docker.yml
-  IMAGE: ghcr.io/${{ github.repository }}/adaptive-inference
+  # Image built by rl-docker.yml (must be lowercase for GHCR)
+  IMAGE: ghcr.io/hemanth1403/ie7374-mlops-adaptive-ml-inference/adaptive-inference
 
 jobs:
   deploy:

@@ -4,7 +4,7 @@ metadata:
   name: adaptive-inference-config
   namespace: adaptive-inference
 data:
-  INFERENCE_DEVICE: "cuda"
+  INFERENCE_DEVICE: "cpu"
   RL_MODEL_PATH: "models/PPO_v6/final_adaptive_model.zip"
   YOLO_N_PATH: "yolov8n.pt"
   YOLO_S_PATH: "yolov8s.pt"
