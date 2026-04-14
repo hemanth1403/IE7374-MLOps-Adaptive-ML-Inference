@@ -12,3 +12,4 @@ data:
   MLFLOW_TRACKING_URI: "http://mlflow-service:5000"
   # Streamlit connects to the backend via in-cluster DNS
   WS_URL: "ws://backend-service:8000/ws/stream"
+  CAMERA_MODE: "browser"
