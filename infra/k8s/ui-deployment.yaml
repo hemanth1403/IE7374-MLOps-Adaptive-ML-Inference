@@ -1,0 +1,70 @@
+# Streamlit dashboard — CPU-only, 2 replicas for availability.
+# Uses the same container image but overrides the CMD to launch Streamlit.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui
+  namespace: adaptive-inference
+  labels:
+    app: ui
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ui
+  template:
+    metadata:
+      labels:
+        app: ui
+    spec:
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: streamlit
+          image: ghcr.io/hemanth1403/ie7374-mlops-adaptive-ml-inference/adaptive-inference:latest
+          imagePullPolicy: Always
+
+          command:
+            - streamlit
+            - run
+            - serving/ui.py
+            - --server.port=8501
+            - --server.address=0.0.0.0
+            - --server.headless=true
+            - --server.fileWatcherType=none
+
+          ports:
+            - containerPort: 8501
+              name: http
+
+          env:
+            - name: WS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: adaptive-inference-config
+                  key: WS_URL
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+
+          # Streamlit exposes a built-in health endpoint
+          readinessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3

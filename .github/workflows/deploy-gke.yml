@@ -1,0 +1,164 @@
+name: Deploy to GKE
+
+# Triggers after the Docker image is successfully built and pushed to GHCR.
+# Only runs on pushes to main (not PRs) so staging/production is never broken.
+on:
+  workflow_run:
+    workflows: ["RL Docker Build & Push"]
+    types: [completed]
+    branches: [main]
+
+  # Allow manual deploy from the Actions tab (e.g., for rollbacks)
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (default: latest)"
+        required: false
+        default: "latest"
+
+env:
+  GCP_PROJECT_ID: rl-orchestration-project
+  GKE_CLUSTER: adaptive-inference-cluster
+  GKE_ZONE: us-central1-a
+  NAMESPACE: adaptive-inference
+  # Image built by rl-docker.yml
+  IMAGE: ghcr.io/${{ github.repository }}/adaptive-inference
+
+jobs:
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+
+    # Only deploy if the triggering Docker build succeeded
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    permissions:
+      contents: read
+      id-token: write    # Required for Workload Identity Federation
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Resolve image tag ─────────────────────────────────────────────────────
+      - name: Set image tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.image_tag }}"
+          else
+            TAG="sha-$(echo ${{ github.event.workflow_run.head_sha }} | cut -c1-7)"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Deploying image tag: ${TAG}"
+
+      # ── Authenticate to GCP ───────────────────────────────────────────────────
+      # Option A: Service Account Key (simpler, less secure)
+      # Store the full JSON key as the GKE_SA_KEY secret in GitHub.
+      - name: Authenticate to GCP (Service Account Key)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_GKE_SERVICE_ACCOUNT_JSON }}
+
+      # Option B: Workload Identity Federation (recommended for production)
+      # Uncomment the block below and comment out Option A.
+      # Requires one-time setup of a Workload Identity Pool:
+      #   https://github.com/google-github-actions/auth?tab=readme-ov-file#workload-identity-federation-through-a-service-account
+      #
+      # - name: Authenticate to GCP (Workload Identity)
+      #   uses: google-github-actions/auth@v2
+      #   with:
+      #     workload_identity_provider: projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/<POOL>/providers/<PROVIDER>
+      #     service_account: gke-deploy@rl-orchestration-project.iam.gserviceaccount.com
+
+      # ── Configure kubectl ─────────────────────────────────────────────────────
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_ZONE }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      # ── Ensure namespace + base resources exist ───────────────────────────────
+      - name: Apply namespace and config
+        run: |
+          kubectl apply -f infra/k8s/namespace.yaml
+          kubectl apply -f infra/k8s/configmap.yaml
+          kubectl apply -f infra/k8s/pvc.yaml
+
+      # ── Apply monitoring stack ────────────────────────────────────────────────
+      - name: Apply monitoring stack
+        run: |
+          kubectl apply -f infra/monitoring/prometheus-configmap.yaml
+          kubectl apply -f infra/monitoring/prometheus-deployment.yaml
+          kubectl apply -f infra/monitoring/grafana-deployment.yaml
+          # Load Grafana dashboard JSON into ConfigMap
+          kubectl create configmap grafana-dashboards \
+            --from-file=adaptive-inference.json=infra/monitoring/grafana-dashboard.json \
+            -n ${{ env.NAMESPACE }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # ── Deploy MLflow ─────────────────────────────────────────────────────────
+      - name: Deploy MLflow
+        run: |
+          kubectl apply -f infra/k8s/mlflow-deployment.yaml
+          kubectl apply -f infra/k8s/mlflow-service.yaml
+
+      # ── Deploy backend (rolling update with new image) ────────────────────────
+      - name: Deploy backend
+        run: |
+          # Substitute placeholder with actual repo image
+          sed "s|ghcr.io/hemanth1403/ie7374-mlops-adaptive-ml-inference/adaptive-inference:latest|${{ env.IMAGE }}:${{ steps.tag.outputs.tag }}|g" \
+            infra/k8s/backend-deployment.yaml | kubectl apply -f -
+          kubectl apply -f infra/k8s/backend-service.yaml
+
+      # ── Deploy UI ─────────────────────────────────────────────────────────────
+      - name: Deploy UI
+        run: |
+          sed "s|ghcr.io/hemanth1403/ie7374-mlops-adaptive-ml-inference/adaptive-inference:latest|${{ env.IMAGE }}:${{ steps.tag.outputs.tag }}|g" \
+            infra/k8s/ui-deployment.yaml | kubectl apply -f -
+          kubectl apply -f infra/k8s/ui-service.yaml
+          kubectl apply -f infra/k8s/hpa.yaml
+
+      # ── Apply ingress ─────────────────────────────────────────────────────────
+      - name: Apply ingress
+        run: kubectl apply -f infra/k8s/ingress.yaml
+
+      # ── Wait for rollout ──────────────────────────────────────────────────────
+      - name: Wait for backend rollout
+        run: |
+          kubectl rollout status deployment/backend \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=600s
+
+      - name: Wait for UI rollout
+        run: |
+          kubectl rollout status deployment/ui \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=120s
+
+      # ── Smoke test ────────────────────────────────────────────────────────────
+      - name: Health check backend
+        run: |
+          # Get backend ClusterIP and port-forward for the check
+          kubectl port-forward svc/backend-service 8000:8000 \
+            -n ${{ env.NAMESPACE }} &
+          sleep 5
+          curl -f http://localhost:8000/health/ready || \
+            (echo "Backend readiness check FAILED" && exit 1)
+          echo "Backend is healthy"
+
+      # ── Print summary ─────────────────────────────────────────────────────────
+      - name: Print deployed resources
+        if: always()
+        run: |
+          echo "=== Deployments ==="
+          kubectl get deployments -n ${{ env.NAMESPACE }}
+          echo "=== Pods ==="
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          echo "=== Services ==="
+          kubectl get services -n ${{ env.NAMESPACE }}
+          echo "=== HPA ==="
+          kubectl get hpa -n ${{ env.NAMESPACE }}

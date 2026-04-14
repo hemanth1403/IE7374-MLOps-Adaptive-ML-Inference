@@ -43,6 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libxrender1 \
         libgomp1 \
         git \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN ln -sf /usr/bin/python3.10 /usr/bin/python && \
@@ -65,10 +66,18 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY core/ ./core/
 COPY serving/ ./serving/
 
+# ── Non-root user (principle of least privilege) ──────────────────────────────
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
 # ── Ports ─────────────────────────────────────────────────────────────────────
 # 8000 — FastAPI / uvicorn
 # 8501 — Streamlit
 EXPOSE 8000 8501
+
+# ── Health check for Docker and docker-compose ────────────────────────────────
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD curl -f http://localhost:8000/health/startup || exit 1
 
 # ── Default: start the FastAPI inference server ───────────────────────────────
 CMD ["uvicorn", "serving.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

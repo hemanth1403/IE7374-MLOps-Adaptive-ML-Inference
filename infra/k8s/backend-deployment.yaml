@@ -1,0 +1,103 @@
+# FastAPI inference backend — GPU node, single replica (GPU constraint).
+# Probe timeline on a cold start:
+#   startupProbe  : tries every 5s for up to 10 min (GPU warmup + 3 YOLO loads)
+#   readinessProbe: starts after startupProbe succeeds, gates traffic
+#   livenessProbe : runs throughout; restarts pod on repeated failure
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: adaptive-inference
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8000"
+    spec:
+      terminationGracePeriodSeconds: 60
+
+      # Schedule on the GPU node pool
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-tesla-t4
+
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+
+      containers:
+        - name: adaptive-inference
+          # Image is built and pushed by .github/workflows/rl-docker.yml
+          # Replace <OWNER> with your GitHub org/user
+          image: ghcr.io/hemanth1403/ie7374-mlops-adaptive-ml-inference/adaptive-inference:latest
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 8000
+              name: http
+            - containerPort: 8501
+              name: streamlit
+
+          envFrom:
+            - configMapRef:
+                name: adaptive-inference-config
+
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: "16Gi"
+              nvidia.com/gpu: "1"
+
+          volumeMounts:
+            - name: model-weights
+              mountPath: /app/models
+
+          # Startup probe: waits for GPU warmup (up to 10 minutes)
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: 8000
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            failureThreshold: 120   # 120 × 5s = 10 minutes max
+
+          # Readiness probe: gates traffic; fails during SIGTERM drain
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 2
+            successThreshold: 1
+
+          # Liveness probe: restarts pod if engine becomes unresponsive
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+
+      volumes:
+        - name: model-weights
+          persistentVolumeClaim:
+            claimName: model-weights-pvc
+
+      # Pull from GHCR (set up imagePullSecrets if repo is private)
+      # imagePullSecrets:
+      #   - name: ghcr-credentials

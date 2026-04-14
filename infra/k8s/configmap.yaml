@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adaptive-inference-config
+  namespace: adaptive-inference
+data:
+  INFERENCE_DEVICE: "cuda"
+  RL_MODEL_PATH: "models/PPO_v6/final_adaptive_model.zip"
+  YOLO_N_PATH: "yolov8n.pt"
+  YOLO_S_PATH: "yolov8s.pt"
+  YOLO_L_PATH: "yolov8l.pt"
+  MLFLOW_TRACKING_URI: "http://mlflow-service:5000"
+  # Streamlit connects to the backend via in-cluster DNS
+  WS_URL: "ws://backend-service:8000/ws/stream"

@@ -1,0 +1,165 @@
+# Production docker-compose for single-GPU machines (alternative to GKE).
+# Runs: FastAPI backend, Streamlit UI, MLflow, Prometheus, Grafana.
+#
+# Usage (from the repo root):
+#   docker compose -f infra/docker/docker-compose.prod.yaml up -d
+#
+# Prerequisites:
+#   - NVIDIA Container Toolkit installed on the host
+#   - Model files present in model_pipeline/src/RL/:
+#       models/PPO_v6/final_adaptive_model.zip
+#       yolov8n.pt, yolov8s.pt, yolov8l.pt
+#
+# Access:
+#   Dashboard  → http://localhost:8501
+#   API        → http://localhost:8000
+#   MLflow     → http://localhost:5000
+#   Prometheus → http://localhost:9090
+#   Grafana    → http://localhost:3000  (admin / admin)
+
+name: adaptive-inference-prod
+
+x-rl-root: &rl-root ./model_pipeline/src/RL
+
+services:
+
+  # ── FastAPI inference backend (GPU) ──────────────────────────────────────────
+  backend:
+    image: ghcr.io/hemanth1403/ie7374-mlops-adaptive-ml-inference/adaptive-inference:latest
+    build:
+      context: *rl-root
+      dockerfile: Dockerfile
+    container_name: adaptive-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      INFERENCE_DEVICE: cuda
+      RL_MODEL_PATH: models/PPO_v6/final_adaptive_model.zip
+      YOLO_N_PATH: yolov8n.pt
+      YOLO_S_PATH: yolov8s.pt
+      YOLO_L_PATH: yolov8l.pt
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./model_pipeline/src/RL/models:/app/models:ro
+      - ./model_pipeline/src/RL/yolov8n.pt:/app/yolov8n.pt:ro
+      - ./model_pipeline/src/RL/yolov8s.pt:/app/yolov8s.pt:ro
+      - ./model_pipeline/src/RL/yolov8l.pt:/app/yolov8l.pt:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/startup"]
+      interval: 30s
+      timeout: 10s
+      retries: 20         # Up to 10 min for GPU warmup
+      start_period: 120s
+    networks:
+      - inference-net
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
+  # ── Streamlit dashboard (CPU) ─────────────────────────────────────────────────
+  ui:
+    image: ghcr.io/hemanth1403/ie7374-mlops-adaptive-ml-inference/adaptive-inference:latest
+    build:
+      context: *rl-root
+      dockerfile: Dockerfile
+    container_name: adaptive-ui
+    restart: unless-stopped
+    command: >
+      streamlit run serving/ui.py
+      --server.port=8501
+      --server.address=0.0.0.0
+      --server.headless=true
+      --server.fileWatcherType=none
+    ports:
+      - "8501:8501"
+    environment:
+      WS_URL: ws://backend:8000/ws/stream
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - inference-net
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ── MLflow tracking server ────────────────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.9.2
+    container_name: adaptive-mlflow
+    restart: unless-stopped
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:////mlflow-data/mlflow.db
+      --default-artifact-root /mlflow-data/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow-data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - inference-net
+
+  # ── Prometheus metrics collection ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: adaptive-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/monitoring/prometheus-configmap.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - inference-net
+    depends_on:
+      - backend
+
+  # ── Grafana dashboard ─────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: adaptive-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin   # Change in production
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/adaptive-inference.json:ro
+    networks:
+      - inference-net
+    depends_on:
+      - prometheus
+
+volumes:
+  mlflow-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  inference-net:
+    driver: bridge

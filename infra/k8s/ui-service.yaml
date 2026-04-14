@@ -1,0 +1,19 @@
+# LoadBalancer service for the Streamlit dashboard.
+# GKE provisions an external IP automatically.
+# Access the dashboard at: http://<EXTERNAL-IP>/
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui-service
+  namespace: adaptive-inference
+  labels:
+    app: ui
+spec:
+  type: LoadBalancer
+  selector:
+    app: ui
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8501
+      protocol: TCP

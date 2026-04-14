@@ -1,0 +1,19 @@
+# Internal ClusterIP for MLflow — backend and Streamlit use this to log runs.
+# Not exposed externally; use `kubectl port-forward` to access the UI locally:
+#   kubectl port-forward svc/mlflow-service 5000:5000 -n adaptive-inference
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-service
+  namespace: adaptive-inference
+  labels:
+    app: mlflow
+spec:
+  type: ClusterIP
+  selector:
+    app: mlflow
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000
+      protocol: TCP

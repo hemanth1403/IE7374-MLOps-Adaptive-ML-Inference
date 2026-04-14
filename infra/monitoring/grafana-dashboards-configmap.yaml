@@ -1,0 +1,19 @@
+# Loads grafana-dashboard.json into a ConfigMap so Grafana can auto-provision it.
+# Apply this after creating the dashboard JSON file.
+#
+# Usage:
+#   kubectl create configmap grafana-dashboards \
+#     --from-file=adaptive-inference.json=infra/monitoring/grafana-dashboard.json \
+#     -n adaptive-inference \
+#     --dry-run=client -o yaml | kubectl apply -f -
+#
+# The grafana-deployment.yaml mounts this ConfigMap at /var/lib/grafana/dashboards.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: adaptive-inference
+binaryData: {}
+# Data is populated via the kubectl create configmap command above.
+# Keeping this file as a placeholder so kubectl apply -f infra/ works.
+data: {}

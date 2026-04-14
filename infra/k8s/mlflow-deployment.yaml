@@ -1,0 +1,71 @@
+# MLflow tracking server — SQLite backend on PVC, artifacts on GCS.
+# Accessible cluster-internally at: http://mlflow-service:5000
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: adaptive-inference
+  labels:
+    app: mlflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: mlflow
+          image: ghcr.io/mlflow/mlflow:v2.9.2
+          imagePullPolicy: IfNotPresent
+
+          command:
+            - mlflow
+            - server
+            - --host=0.0.0.0
+            - --port=5000
+            - --backend-store-uri=sqlite:////mlflow-data/mlflow.db
+            # Artifacts stored in the same GCS bucket used by DVC
+            - --default-artifact-root=gs://modelpipelinerl/mlflow-artifacts
+
+          ports:
+            - containerPort: 5000
+              name: http
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+
+          volumeMounts:
+            - name: mlflow-db
+              mountPath: /mlflow-data
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            failureThreshold: 3
+
+      volumes:
+        - name: mlflow-db
+          persistentVolumeClaim:
+            claimName: mlflow-db-pvc
