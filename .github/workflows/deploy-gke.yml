@@ -60,7 +60,7 @@ jobs:
       - name: Authenticate to GCP (Service Account Key)
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_GKE_SERVICE_ACCOUNT_JSON }}
+          credentials_json: ${{ secrets.GKE_SA_KEY }}
 
       # Option B: Workload Identity Federation (recommended for production)
       # Uncomment the block below and comment out Option A.
