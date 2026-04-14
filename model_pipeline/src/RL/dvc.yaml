@@ -46,7 +46,7 @@ stages:
           - paths
     outs:
       - models/PPO_v6/final_adaptive_model.zip
-      - models/PPO_v6/bc_init_model.zip
+      
 
   # ── Stage 3: Evaluate trained policy ──────────────────────────────────────
   # Runs a 1000-step deterministic rollout and reports the action distribution

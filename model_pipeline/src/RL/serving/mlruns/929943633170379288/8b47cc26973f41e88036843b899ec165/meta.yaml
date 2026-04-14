@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/jan10/FINAL_GOOGLE_EXPO/IE7374-MLOps-Adaptive-ML-Inference/model_pipeline/src/RL/serving/mlruns/929943633170379288/8b47cc26973f41e88036843b899ec165/artifacts
+end_time: 1776191293503
+entry_point_name: ''
+experiment_id: '929943633170379288'
+lifecycle_stage: active
+run_id: 8b47cc26973f41e88036843b899ec165
+run_name: amusing-quail-566
+run_uuid: 8b47cc26973f41e88036843b899ec165
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1776191271083
+status: 3
+tags: []
+user_id: jan10

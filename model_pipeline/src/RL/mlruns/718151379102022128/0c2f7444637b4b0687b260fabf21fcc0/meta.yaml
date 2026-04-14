@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/jan10/FINAL_GOOGLE_EXPO/IE7374-MLOps-Adaptive-ML-Inference/model_pipeline/src/RL/mlruns/718151379102022128/0c2f7444637b4b0687b260fabf21fcc0/artifacts
+end_time: 1776133452988
+entry_point_name: ''
+experiment_id: '718151379102022128'
+lifecycle_stage: active
+run_id: 0c2f7444637b4b0687b260fabf21fcc0
+run_name: enthused-goose-300
+run_uuid: 0c2f7444637b4b0687b260fabf21fcc0
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1776133446695
+status: 3
+tags: []
+user_id: jan10

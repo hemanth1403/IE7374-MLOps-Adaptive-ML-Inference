@@ -1,2 +1,5 @@
 [core]
     no_scm = True
+    remote = model_pipeline
+['remote "model_pipeline"']
+    url = gs://modelpipelinerl

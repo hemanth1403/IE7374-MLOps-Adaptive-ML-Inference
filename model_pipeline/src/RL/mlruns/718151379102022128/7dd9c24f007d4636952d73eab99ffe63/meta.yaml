@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/jan10/FINAL_GOOGLE_EXPO/IE7374-MLOps-Adaptive-ML-Inference/model_pipeline/src/RL/mlruns/718151379102022128/7dd9c24f007d4636952d73eab99ffe63/artifacts
+end_time: 1776134905222
+entry_point_name: ''
+experiment_id: '718151379102022128'
+lifecycle_stage: active
+run_id: 7dd9c24f007d4636952d73eab99ffe63
+run_name: salty-frog-320
+run_uuid: 7dd9c24f007d4636952d73eab99ffe63
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1776134422578
+status: 3
+tags: []
+user_id: jan10

@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import sys
 import os
+import torch
 # Ensure the RL root is on sys.path so package imports resolve correctly
 _RL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _RL_ROOT not in sys.path:
@@ -59,11 +60,14 @@ from serving.tracking import SessionTracker
 # ──────────────────────────────────────────────────────────────────────────────
 # Configuration (via environment variables with sensible defaults)
 # ──────────────────────────────────────────────────────────────────────────────
-RL_MODEL_PATH = os.getenv("RL_MODEL_PATH", "models/PPO_v6/final_adaptive_model.zip")
+RL_MODEL_PATH = os.path.join(_RL_ROOT, "models", "PPO_v6", "final_adaptive_model")
 YOLO_N_PATH   = os.getenv("YOLO_N_PATH",   "yolov8n.pt")
 YOLO_S_PATH   = os.getenv("YOLO_S_PATH",   "yolov8s.pt")
 YOLO_L_PATH   = os.getenv("YOLO_L_PATH",   "yolov8l.pt")
-DEVICE        = os.getenv("INFERENCE_DEVICE", "cuda")
+DEVICE = os.getenv("INFERENCE_DEVICE")
+
+if DEVICE is None:
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Engine singleton — loaded once at startup, shared across all connections

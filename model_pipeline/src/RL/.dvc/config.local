@@ -1,0 +1,2 @@
+['remote "model_pipeline"']
+    credentialpath = ../../../keys/rl-orchestration-model_pipeline.json

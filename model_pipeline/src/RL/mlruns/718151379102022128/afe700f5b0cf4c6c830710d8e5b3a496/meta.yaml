@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/jan10/FINAL_GOOGLE_EXPO/IE7374-MLOps-Adaptive-ML-Inference/model_pipeline/src/RL/mlruns/718151379102022128/afe700f5b0cf4c6c830710d8e5b3a496/artifacts
+end_time: 1776134377860
+entry_point_name: ''
+experiment_id: '718151379102022128'
+lifecycle_stage: active
+run_id: afe700f5b0cf4c6c830710d8e5b3a496
+run_name: peaceful-fly-532
+run_uuid: afe700f5b0cf4c6c830710d8e5b3a496
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1776134319094
+status: 3
+tags: []
+user_id: jan10

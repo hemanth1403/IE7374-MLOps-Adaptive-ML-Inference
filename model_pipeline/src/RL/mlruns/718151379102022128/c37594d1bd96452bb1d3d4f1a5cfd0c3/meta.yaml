@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/jan10/FINAL_GOOGLE_EXPO/IE7374-MLOps-Adaptive-ML-Inference/model_pipeline/src/RL/mlruns/718151379102022128/c37594d1bd96452bb1d3d4f1a5cfd0c3/artifacts
+end_time: 1776133149742
+entry_point_name: ''
+experiment_id: '718151379102022128'
+lifecycle_stage: active
+run_id: c37594d1bd96452bb1d3d4f1a5cfd0c3
+run_name: sedate-snipe-55
+run_uuid: c37594d1bd96452bb1d3d4f1a5cfd0c3
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1776133029923
+status: 3
+tags: []
+user_id: jan10

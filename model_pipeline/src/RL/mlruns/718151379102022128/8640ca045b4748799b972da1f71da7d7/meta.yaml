@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/jan10/FINAL_GOOGLE_EXPO/IE7374-MLOps-Adaptive-ML-Inference/model_pipeline/src/RL/mlruns/718151379102022128/8640ca045b4748799b972da1f71da7d7/artifacts
+end_time: 1776134008136
+entry_point_name: ''
+experiment_id: '718151379102022128'
+lifecycle_stage: active
+run_id: 8640ca045b4748799b972da1f71da7d7
+run_name: nervous-horse-778
+run_uuid: 8640ca045b4748799b972da1f71da7d7
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1776133957998
+status: 3
+tags: []
+user_id: jan10
