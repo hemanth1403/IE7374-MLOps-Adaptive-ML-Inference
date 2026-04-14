@@ -262,8 +262,8 @@ if run and camera_frame is not None:
                       bsl["avg_confidence"], is_adaptive=False)
 
     # ── Update video feeds ────────────────────────────────────────────────────
-    feed_l.image(_to_rgb(af), channels="RGB", use_container_width=True)
-    feed_r.image(_to_rgb(bf), channels="RGB", use_container_width=True)
+    feed_l.image(_to_rgb(af), channels="RGB", use_column_width=True)
+    feed_r.image(_to_rgb(bf), channels="RGB", use_column_width=True)
 
     # ── Per-path metrics ──────────────────────────────────────────────────────
     ph_model_l.metric("Model",      adp["model_name"])
