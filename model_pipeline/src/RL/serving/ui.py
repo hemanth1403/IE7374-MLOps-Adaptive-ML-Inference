@@ -1,11 +1,16 @@
 """
 ui.py — Streamlit dashboard for the Adaptive ML Inference System.
 
+Uses st.camera_input to capture frames from the browser's webcam — works on
+any deployed URL without requiring HTTPS or a physical camera on the server.
+
 Layout
 ------
 ┌──────────────────────────────────────────────────────────────────┐
+│  [Camera Feed]                                                   │
+├──────────────────────────────────────────────────────────────────┤
 │  Path A — RL Adaptive       │  Path B — Baseline (Small)         │
-│  [live annotated feed]      │  [live annotated feed]             │
+│  [annotated frame]          │  [annotated frame]                 │
 │  Model | Objects | Conf     │  Model | Objects | Conf            │
 ├──────────────────────────────────────────────────────────────────┤
 │  Adp Latency │ Bsl Latency │ Savings │ Adp Conf │ Bsl Conf │ ΔConf │
@@ -25,6 +30,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import time
 from typing import Any, Dict, List
 
 import altair as alt
@@ -92,6 +98,22 @@ def _to_rgb(frame: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Session state initialisation
+# ──────────────────────────────────────────────────────────────────────────────
+if "ws_conn" not in st.session_state:
+    st.session_state.ws_conn = None
+if "frame_count" not in st.session_state:
+    st.session_state.frame_count = 0
+if "adaptive_lats" not in st.session_state:
+    st.session_state.adaptive_lats: List[float] = []
+if "baseline_lats" not in st.session_state:
+    st.session_state.baseline_lats: List[float] = []
+if "adaptive_confs" not in st.session_state:
+    st.session_state.adaptive_confs: List[float] = []
+if "baseline_confs" not in st.session_state:
+    st.session_state.baseline_confs: List[float] = []
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Page config (must be the very first Streamlit call)
 # ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -101,7 +123,7 @@ st.set_page_config(
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Static layout — placeholders updated in-place during the streaming loop
+# Header controls
 # ──────────────────────────────────────────────────────────────────────────────
 st.title("Adaptive ML Inference — Live Dashboard")
 
@@ -116,6 +138,32 @@ st.caption(
     "Path A uses the PPO RL agent to dynamically route frames to the optimal "
     f"YOLOv8 variant. Path B uses YOLOv8-{baseline_choice} as a fixed baseline."
 )
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Camera input (browser webcam — no server camera needed)
+# ──────────────────────────────────────────────────────────────────────────────
+if run:
+    st.info("Allow camera access when prompted by your browser.")
+    # Changing the key on each frame forces a new capture automatically
+    camera_frame = st.camera_input(
+        "Live Camera",
+        key=f"cam_{st.session_state.frame_count}",
+        label_visibility="collapsed",
+    )
+else:
+    camera_frame = None
+    # Close WebSocket when stream is stopped
+    if st.session_state.ws_conn is not None:
+        try:
+            st.session_state.ws_conn.close()
+        except Exception:
+            pass
+        st.session_state.ws_conn = None
+        st.session_state.frame_count = 0
+        st.session_state.adaptive_lats = []
+        st.session_state.baseline_lats = []
+        st.session_state.adaptive_confs = []
+        st.session_state.baseline_confs = []
 
 # ── Video feeds ───────────────────────────────────────────────────────────────
 col_l, col_r = st.columns(2)
@@ -160,142 +208,150 @@ with chart_r:
     ph_conf_chart = st.empty()
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Streaming loop — runs only while the toggle is ON
+# Frame processing — runs when a camera frame is captured
 # ──────────────────────────────────────────────────────────────────────────────
-if run:
+if run and camera_frame is not None:
+
+    # Establish or reuse WebSocket connection
+    if st.session_state.ws_conn is None:
+        try:
+            st.session_state.ws_conn = websocket.create_connection(WS_URL, timeout=5)
+        except Exception as exc:
+            st.error(f"Cannot connect to inference server at **{WS_URL}** — {exc}")
+            st.stop()
+
+    # Decode JPEG from browser camera → OpenCV BGR
+    img_bytes = camera_frame.getvalue()
+    arr = np.frombuffer(img_bytes, dtype=np.uint8)
+    frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+
+    if frame is None:
+        st.warning("Could not decode camera frame.")
+        st.stop()
+
+    # Re-encode as JPEG at target quality and send to backend
+    _, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+    b64 = base64.b64encode(jpeg.tobytes()).decode()
+
     try:
-        ws_conn = websocket.create_connection(WS_URL, timeout=5)
+        st.session_state.ws_conn.send(
+            json.dumps({"frame": b64, "baseline_model": baseline_choice})
+        )
+        raw = st.session_state.ws_conn.recv()
+        result = json.loads(raw)
     except Exception as exc:
-        st.error(f"Cannot connect to inference server at **{WS_URL}** — {exc}")
+        st.session_state.ws_conn = None
+        st.error(f"Connection lost — {exc}")
         st.stop()
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        ws_conn.close()
-        st.error("Webcam not found or already in use.")
-        st.stop()
+    if "error" in result:
+        st.session_state.frame_count += 1
+        st.rerun()
 
-    adaptive_lats:  List[float] = []
-    baseline_lats:  List[float] = []
-    adaptive_confs: List[float] = []
-    baseline_confs: List[float] = []
+    adp = result["adaptive"]
+    bsl = result["baseline"]
 
-    try:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                st.warning("Webcam read failed — stopping stream.")
-                break
+    # ── Annotate frames ───────────────────────────────────────────────────────
+    adp_color = MODEL_COLORS.get(adp["model_name"], (200, 200, 200))
+    af = _draw_boxes(frame, adp["detections"], adp_color)
+    af = _overlay_hud(af, adp["model_name"], adp["latency_ms"],
+                      adp["avg_confidence"], is_adaptive=True)
 
-            # Encode frame → base64 JPEG → send to FastAPI WS
-            _, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
-            b64 = base64.b64encode(jpeg.tobytes()).decode()
-            ws_conn.send(json.dumps({"frame": b64, "baseline_model": baseline_choice}))
+    bf = _draw_boxes(frame, bsl["detections"], BASELINE_COLOR)
+    bf = _overlay_hud(bf, bsl["model_name"], bsl["latency_ms"],
+                      bsl["avg_confidence"], is_adaptive=False)
 
-            raw = ws_conn.recv()
-            result = json.loads(raw)
+    # ── Update video feeds ────────────────────────────────────────────────────
+    feed_l.image(_to_rgb(af), channels="RGB", use_container_width=True)
+    feed_r.image(_to_rgb(bf), channels="RGB", use_container_width=True)
 
-            if "error" in result:
-                continue
+    # ── Per-path metrics ──────────────────────────────────────────────────────
+    ph_model_l.metric("Model",      adp["model_name"])
+    ph_count_l.metric("Objects",    adp["object_count"])
+    ph_conf_l.metric( "Confidence", f"{adp['avg_confidence']:.2f}")
 
-            adp = result["adaptive"]
-            bsl = result["baseline"]
+    ph_model_r.metric("Model",      bsl["model_name"])
+    ph_count_r.metric("Objects",    bsl["object_count"])
+    ph_conf_r.metric( "Confidence", f"{bsl['avg_confidence']:.2f}")
 
-            # ── Annotate frames ───────────────────────────────────────────────
-            adp_color = MODEL_COLORS.get(adp["model_name"], (200, 200, 200))
-            af = _draw_boxes(frame, adp["detections"], adp_color)
-            af = _overlay_hud(af, adp["model_name"], adp["latency_ms"],
-                              adp["avg_confidence"], is_adaptive=True)
+    # ── Summary metrics ───────────────────────────────────────────────────────
+    lat_savings = bsl["latency_ms"] - adp["latency_ms"]
+    conf_delta  = adp["avg_confidence"] - bsl["avg_confidence"]
 
-            bf = _draw_boxes(frame, bsl["detections"], BASELINE_COLOR)
-            bf = _overlay_hud(bf, bsl["model_name"], bsl["latency_ms"],
-                              bsl["avg_confidence"], is_adaptive=False)
+    ph_lat_a.metric("Adaptive Latency", f"{adp['latency_ms']:.1f} ms")
+    ph_lat_b.metric("Baseline Latency", f"{bsl['latency_ms']:.1f} ms")
+    ph_saving.metric(
+        "Latency Savings",
+        f"{lat_savings:.1f} ms",
+        delta=f"{lat_savings:.1f} ms",
+        delta_color="normal",
+    )
+    ph_aconf.metric("Adaptive Conf",  f"{adp['avg_confidence']:.2f}")
+    ph_bconf.metric("Baseline Conf",  f"{bsl['avg_confidence']:.2f}")
+    ph_cdelta.metric(
+        "Conf Gain",
+        f"{conf_delta:+.2f}",
+        delta=f"{conf_delta:+.2f}",
+        delta_color="normal",
+    )
 
-            # ── Update video feeds ────────────────────────────────────────────
-            feed_l.image(_to_rgb(af), channels="RGB", use_container_width=True)
-            feed_r.image(_to_rgb(bf), channels="RGB", use_container_width=True)
+    # ── Rolling history ───────────────────────────────────────────────────────
+    st.session_state.adaptive_lats.append(adp["latency_ms"])
+    st.session_state.baseline_lats.append(bsl["latency_ms"])
+    st.session_state.adaptive_confs.append(adp["avg_confidence"])
+    st.session_state.baseline_confs.append(bsl["avg_confidence"])
 
-            # ── Per-path metrics ──────────────────────────────────────────────
-            ph_model_l.metric("Model",   adp["model_name"])
-            ph_count_l.metric("Objects", adp["object_count"])
-            ph_conf_l.metric( "Confidence", f"{adp['avg_confidence']:.2f}")
+    if len(st.session_state.adaptive_lats) > MAX_CHART_FRAMES:
+        st.session_state.adaptive_lats.pop(0)
+        st.session_state.baseline_lats.pop(0)
+        st.session_state.adaptive_confs.pop(0)
+        st.session_state.baseline_confs.pop(0)
 
-            ph_model_r.metric("Model",   bsl["model_name"])
-            ph_count_r.metric("Objects", bsl["object_count"])
-            ph_conf_r.metric( "Confidence", f"{bsl['avg_confidence']:.2f}")
+    # ── Charts ────────────────────────────────────────────────────────────────
+    _color_scale = alt.Scale(
+        domain=["Baseline", "Adaptive"],
+        range=["#1f77b4", "#FF6B35"],
+    )
+    _dash_scale = alt.Scale(
+        domain=["Baseline", "Adaptive"],
+        range=[[6, 4], [0, 0]],
+    )
 
-            # ── Summary metrics ───────────────────────────────────────────────
-            lat_savings  = bsl["latency_ms"] - adp["latency_ms"]
-            conf_delta   = adp["avg_confidence"] - bsl["avg_confidence"]
+    frames = list(range(len(st.session_state.adaptive_lats)))
 
-            ph_lat_a.metric("Adaptive Latency",  f"{adp['latency_ms']:.1f} ms")
-            ph_lat_b.metric("Baseline Latency",  f"{bsl['latency_ms']:.1f} ms")
-            ph_saving.metric(
-                "Latency Savings",
-                f"{lat_savings:.1f} ms",
-                delta=f"{lat_savings:.1f} ms",
-                delta_color="normal",
-            )
-            ph_aconf.metric("Adaptive Conf",  f"{adp['avg_confidence']:.2f}")
-            ph_bconf.metric("Baseline Conf",  f"{bsl['avg_confidence']:.2f}")
-            ph_cdelta.metric(
-                "Conf Gain",
-                f"{conf_delta:+.2f}",
-                delta=f"{conf_delta:+.2f}",
-                delta_color="normal",
-            )
+    lat_df = pd.DataFrame({
+        "frame": frames,
+        "Adaptive": st.session_state.adaptive_lats,
+        "Baseline": st.session_state.baseline_lats,
+    }).melt("frame", var_name="Series", value_name="Latency (ms)")
 
-            # ── Rolling history ───────────────────────────────────────────────
-            adaptive_lats.append(adp["latency_ms"])
-            baseline_lats.append(bsl["latency_ms"])
-            adaptive_confs.append(adp["avg_confidence"])
-            baseline_confs.append(bsl["avg_confidence"])
+    ph_lat_chart.altair_chart(
+        alt.Chart(lat_df).mark_line().encode(
+            x=alt.X("frame:Q", axis=alt.Axis(title=None, labels=False)),
+            y=alt.Y("Latency (ms):Q"),
+            color=alt.Color("Series:N", scale=_color_scale),
+            strokeDash=alt.StrokeDash("Series:N", scale=_dash_scale),
+        ),
+        use_container_width=True,
+    )
 
-            if len(adaptive_lats) > MAX_CHART_FRAMES:
-                adaptive_lats.pop(0)
-                baseline_lats.pop(0)
-                adaptive_confs.pop(0)
-                baseline_confs.pop(0)
+    conf_df = pd.DataFrame({
+        "frame": frames,
+        "Adaptive": st.session_state.adaptive_confs,
+        "Baseline": st.session_state.baseline_confs,
+    }).melt("frame", var_name="Series", value_name="Confidence")
 
-            # ── Charts — Altair so Baseline is dashed and Adaptive solid,
-            #            keeping both distinguishable even when values are equal ─
-            _color_scale = alt.Scale(
-                domain=["Baseline", "Adaptive"],
-                range=["#1f77b4", "#FF6B35"],
-            )
-            _dash_scale = alt.Scale(
-                domain=["Baseline", "Adaptive"],
-                range=[[6, 4], [0, 0]],   # Baseline dashed, Adaptive solid
-            )
+    ph_conf_chart.altair_chart(
+        alt.Chart(conf_df).mark_line().encode(
+            x=alt.X("frame:Q", axis=alt.Axis(title=None, labels=False)),
+            y=alt.Y("Confidence:Q"),
+            color=alt.Color("Series:N", scale=_color_scale),
+            strokeDash=alt.StrokeDash("Series:N", scale=_dash_scale),
+        ),
+        use_container_width=True,
+    )
 
-            frames = list(range(len(adaptive_lats)))
-
-            lat_df = pd.DataFrame(
-                {"frame": frames, "Adaptive": adaptive_lats, "Baseline": baseline_lats}
-            ).melt("frame", var_name="Series", value_name="Latency (ms)")
-            ph_lat_chart.altair_chart(
-                alt.Chart(lat_df).mark_line().encode(
-                    x=alt.X("frame:Q", axis=alt.Axis(title=None, labels=False)),
-                    y=alt.Y("Latency (ms):Q"),
-                    color=alt.Color("Series:N", scale=_color_scale),
-                    strokeDash=alt.StrokeDash("Series:N", scale=_dash_scale),
-                ),
-                use_container_width=True,
-            )
-
-            conf_df = pd.DataFrame(
-                {"frame": frames, "Adaptive": adaptive_confs, "Baseline": baseline_confs}
-            ).melt("frame", var_name="Series", value_name="Confidence")
-            ph_conf_chart.altair_chart(
-                alt.Chart(conf_df).mark_line().encode(
-                    x=alt.X("frame:Q", axis=alt.Axis(title=None, labels=False)),
-                    y=alt.Y("Confidence:Q"),
-                    color=alt.Color("Series:N", scale=_color_scale),
-                    strokeDash=alt.StrokeDash("Series:N", scale=_dash_scale),
-                ),
-                use_container_width=True,
-            )
-
-    finally:
-        cap.release()
-        ws_conn.close()
+    # Advance frame counter and rerun to capture next frame automatically
+    st.session_state.frame_count += 1
+    time.sleep(0.05)
+    st.rerun()
