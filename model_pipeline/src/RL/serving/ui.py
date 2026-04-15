@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import tempfile
 import time
 from typing import Any, Dict, List
 
@@ -89,7 +90,21 @@ st.set_page_config(page_title="Adaptive ML Inference",
                    layout="wide", initial_sidebar_state="collapsed")
 st.title("Adaptive ML Inference — Live Dashboard")
 
-run: bool = st.toggle("Start Stream", value=False)
+input_mode: str = st.radio(
+    "Input Source", ["Live Camera", "Upload Video"],
+    horizontal=True)
+
+uploaded_video = None
+if input_mode == "Upload Video":
+    uploaded_video = st.file_uploader(
+        "Upload a video file", type=["mp4", "avi", "mov", "mkv"])
+    if uploaded_video:
+        st.caption(f"File: **{uploaded_video.name}**")
+
+_toggle_label = "Process Video" if input_mode == "Upload Video" else "Start Stream"
+_toggle_disabled = (input_mode == "Upload Video" and uploaded_video is None)
+run: bool = st.toggle(_toggle_label, value=False, disabled=_toggle_disabled)
+
 baseline_choice: str = st.selectbox(
     "Baseline model (Path B)", ["Nano", "Small", "Large"], index=1, disabled=run)
 st.caption(
@@ -196,7 +211,7 @@ def _update_ui(frame, result, lats_a, lats_b, confs_a, confs_b, update_left=True
 # ══════════════════════════════════════════════════════════════════════════════
 # MODE A — Local: OpenCV continuous live stream
 # ══════════════════════════════════════════════════════════════════════════════
-if run and CAMERA_MODE == "local":
+if run and input_mode == "Live Camera" and CAMERA_MODE == "local":
     try:
         ws_conn = websocket.create_connection(WS_URL, timeout=5)
     except Exception as exc:
@@ -245,7 +260,7 @@ if run and CAMERA_MODE == "local":
 # No peer-to-peer connection needed, so no NAT issues. Works on any browser
 # that supports getUserMedia (all modern browsers over HTTPS; Firefox also on HTTP).
 # ══════════════════════════════════════════════════════════════════════════════
-elif run and CAMERA_MODE == "browser":
+elif run and input_mode == "Live Camera" and CAMERA_MODE == "browser":
 
     _component_html = f"""<!DOCTYPE html>
 <html>
@@ -409,6 +424,85 @@ init();
 
     with browser_ph.container():
         st.components.v1.html(_component_html, height=580, scrolling=False)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODE C — Upload Video: process frames from an uploaded video file
+# ══════════════════════════════════════════════════════════════════════════════
+elif run and input_mode == "Upload Video":
+    # Save uploaded bytes to a temp file so OpenCV can open it
+    suffix = os.path.splitext(uploaded_video.name)[1] or ".mp4"
+    tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    tmp.write(uploaded_video.read())
+    tmp.flush()
+    tmp.close()
+
+    cap = cv2.VideoCapture(tmp.name)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    st.caption(f"Video info: **{total_frames} frames** @ **{fps:.1f} fps**")
+
+    try:
+        ws_conn = websocket.create_connection(WS_URL, timeout=5)
+    except Exception as exc:
+        cap.release()
+        os.unlink(tmp.name)
+        st.error(f"Cannot connect to inference server at **{WS_URL}** — {exc}")
+        st.stop()
+
+    lats_a: List[float] = []
+    lats_b: List[float] = []
+    confs_a: List[float] = []
+    confs_b: List[float] = []
+    progress_bar = st.progress(0, text="Processing frames…")
+    frame_idx = 0
+
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            _, jpeg = cv2.imencode(".jpg", frame,
+                                   [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+            b64 = base64.b64encode(jpeg.tobytes()).decode()
+            ws_conn.send(json.dumps({"frame": b64, "baseline_model": baseline_choice}))
+
+            raw    = ws_conn.recv()
+            result = json.loads(raw)
+            frame_idx += 1
+
+            if "error" in result:
+                continue
+
+            _update_ui(frame, result, lats_a, lats_b, confs_a, confs_b)
+
+            pct = min(frame_idx / max(total_frames, 1), 1.0)
+            progress_bar.progress(pct, text=f"Frame {frame_idx} / {total_frames}")
+
+        progress_bar.progress(1.0, text="Done — all frames processed.")
+        st.success(f"Processed **{frame_idx} frames** from **{uploaded_video.name}**.")
+
+        # ── Final summary metrics ──────────────────────────────────────────
+        if lats_a:
+            st.subheader("Video Processing Summary")
+            avg_lat_a  = sum(lats_a)  / len(lats_a)
+            avg_lat_b  = sum(lats_b)  / len(lats_b)
+            avg_conf_a = sum(confs_a) / len(confs_a)
+            avg_conf_b = sum(confs_b) / len(confs_b)
+            avg_saving = avg_lat_b - avg_lat_a
+
+            sm1, sm2, sm3, sm4, sm5, sm6 = st.columns(6)
+            sm1.metric("Total Frames",         frame_idx)
+            sm2.metric("Avg Adaptive Latency", f"{avg_lat_a:.1f} ms")
+            sm3.metric("Avg Baseline Latency", f"{avg_lat_b:.1f} ms")
+            sm4.metric("Avg Latency Savings",  f"{avg_saving:.1f} ms",
+                       delta=f"{avg_saving:.1f} ms", delta_color="normal")
+            sm5.metric("Avg Adaptive Conf",    f"{avg_conf_a:.2f}")
+            sm6.metric("Avg Baseline Conf",    f"{avg_conf_b:.2f}")
+    finally:
+        cap.release()
+        ws_conn.close()
+        os.unlink(tmp.name)
 
 else:
     # Stream stopped — reset history
