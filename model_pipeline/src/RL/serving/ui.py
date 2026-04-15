@@ -28,9 +28,17 @@ from typing import Any, Dict, List
 import altair as alt
 import cv2
 import numpy as np
+import inspect
 import pandas as pd
 import streamlit as st
 import websocket  # websocket-client (synchronous)
+
+# st.image gained use_container_width in 1.35+; older versions only have use_column_width
+_IMG_KW = (
+    {"use_container_width": True}
+    if "use_container_width" in inspect.signature(st.image).parameters
+    else {"use_column_width": True}
+)
 
 WS_URL: str       = os.getenv("WS_URL", "ws://localhost:8000/ws/stream")
 CAMERA_MODE: str  = os.getenv("CAMERA_MODE", "local")   # "local" | "browser"
@@ -164,8 +172,8 @@ def _update_ui(frame, result, lats_a, lats_b, confs_a, confs_b, update_left=True
                       bsl["model_name"], bsl["latency_ms"], bsl["avg_confidence"], False)
 
     if update_left:
-        feed_l.image(_to_rgb(af), channels="RGB", use_column_width=True)
-    feed_r.image(_to_rgb(bf), channels="RGB", use_column_width=True)
+        feed_l.image(_to_rgb(af), channels="RGB", **_IMG_KW)
+    feed_r.image(_to_rgb(bf), channels="RGB", **_IMG_KW)
 
     ph_model_l.metric("Model", adp["model_name"])
     ph_count_l.metric("Objects", adp["object_count"])
