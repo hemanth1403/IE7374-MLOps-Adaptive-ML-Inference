@@ -17,8 +17,8 @@ metadata:
     # Long timeouts for persistent WebSocket connections
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    # Allow large base64 JPEG frames
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    # Allow large base64 JPEG frames and video file uploads (up to 500 MB)
+    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
     # Force HTTP/1.1 upstream (required for WebSocket upgrade)
     # Do NOT add configuration-snippet for Upgrade/Connection — the NGINX
     # ingress controller already adds them via its built-in WebSocket support.
