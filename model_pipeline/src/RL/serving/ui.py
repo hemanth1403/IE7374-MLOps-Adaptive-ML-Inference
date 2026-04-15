@@ -256,10 +256,22 @@ elif run and CAMERA_MODE == "browser":
         )
         st.stop()
 
+    # STUN alone fails when GKE pods and browsers are both behind NAT.
+    # TURN relays the media through a server that both sides can reach.
+    # Replace username/credential with your own metered.ca credentials for production.
     RTC_CONFIG = RTCConfiguration({
         "iceServers": [
             {"urls": ["stun:stun.l.google.com:19302"]},
-            {"urls": ["stun:stun1.l.google.com:19302"]},
+            {
+                "urls": [
+                    "turn:openrelay.metered.ca:80",
+                    "turn:openrelay.metered.ca:443",
+                    "turn:openrelay.metered.ca:443?transport=tcp",
+                    "turn:openrelay.metered.ca:80?transport=tcp",
+                ],
+                "username": "openrelayproject",
+                "credential": "openrelayproject",
+            },
         ]
     })
 
