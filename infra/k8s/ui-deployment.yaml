@@ -32,6 +32,8 @@ spec:
             - --server.address=0.0.0.0
             - --server.headless=true
             - --server.fileWatcherType=none
+            - --server.enableCORS=false
+            - --server.enableXsrfProtection=false
 
           ports:
             - containerPort: 8501
