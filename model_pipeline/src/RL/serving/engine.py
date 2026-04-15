@@ -25,6 +25,7 @@ def _patched_load(*args, **kwargs):
 torch.load = _patched_load
 # ─────────────────────────────────────────────────────────────────────────────
 
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
@@ -98,13 +99,15 @@ class AdaptiveInferenceSystem:
         print(f"[Engine] Loading PPO agent from: {rl_model_path}")
         self.agent = PPO.load(rl_model_path, device="cpu")
 
-        # Three YOLO variants on the target device
+        # Three YOLO variants — prefer .onnx (faster CPU) over .pt when available
         print(f"[Engine] Loading YOLO n/s/l on {device} …")
-        self.models: List[YOLO] = [
-            YOLO(yolo_n_path).to(device),
-            YOLO(yolo_s_path).to(device),
-            YOLO(yolo_l_path).to(device),
+        _pairs = [
+            AdaptiveInferenceSystem._load_yolo(yolo_n_path, device),
+            AdaptiveInferenceSystem._load_yolo(yolo_s_path, device),
+            AdaptiveInferenceSystem._load_yolo(yolo_l_path, device),
         ]
+        self.models: List[YOLO] = [m for m, _ in _pairs]
+        self._is_onnx: List[bool] = [f for _, f in _pairs]
 
         # RL state — must be reset between independent sessions
         self.prev_action: int = 0
@@ -120,11 +123,25 @@ class AdaptiveInferenceSystem:
 
         print("[Engine] Ready.")
 
+    @staticmethod
+    def _load_yolo(path: str, device: str):
+        """Prefer .onnx over .pt for faster CPU inference (deployed only).
+        Returns (YOLO model, is_onnx). ONNX models skip .to(device)."""
+        onnx_path = os.path.splitext(path)[0] + ".onnx"
+        if os.path.exists(onnx_path):
+            print(f"[Engine] Using ONNX: {onnx_path}")
+            return YOLO(onnx_path), True
+        print(f"[Engine] Using PyTorch: {path}")
+        return YOLO(path).to(device), False
+
     def _warmup(self) -> None:
-        print(f"[Engine] Warming up CUDA kernels (n/s/l) …")
+        print("[Engine] Warming up models (n/s/l) …")
         dummy = np.zeros((480, 640, 3), dtype=np.uint8)
-        for model in self.models:
-            model(dummy, verbose=False, device=self.device)
+        for i, model in enumerate(self.models):
+            if self._is_onnx[i]:
+                model(dummy, verbose=False)
+            else:
+                model(dummy, verbose=False, device=self.device)
         print("[Engine] Warm-up complete.")
 
     def _build_obs(self, frame: np.ndarray) -> np.ndarray:
@@ -152,7 +169,11 @@ class AdaptiveInferenceSystem:
     def _run_yolo(self, model: YOLO, frame: np.ndarray) -> InferenceResult:
         """Run one YOLO model on a frame and return structured detections."""
         t0 = time.perf_counter()
-        results = model(frame, verbose=False, device=self.device)
+        idx = self.models.index(model)
+        if self._is_onnx[idx]:
+            results = model(frame, verbose=False)
+        else:
+            results = model(frame, verbose=False, device=self.device)
         latency_ms = (time.perf_counter() - t0) * 1000.0
 
         boxes = results[0].boxes

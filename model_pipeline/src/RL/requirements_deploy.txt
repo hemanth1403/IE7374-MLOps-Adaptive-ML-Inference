@@ -19,6 +19,10 @@ websocket-client==1.7.0
 # ── Computer vision ───────────────────────────────────────────────────────────
 opencv-python-headless==4.8.1.78
 
+# ── ONNX runtime (faster CPU inference for deployed YOLO models) ──────────────
+onnx>=1.14.0
+onnxruntime>=1.16.0
+
 # ── Frontend ──────────────────────────────────────────────────────────────────
 # Streamlit 1.30+ started dropping 3.8 support
 streamlit==1.29.0

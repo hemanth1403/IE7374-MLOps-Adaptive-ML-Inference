@@ -95,11 +95,18 @@ input_mode: str = st.radio(
     horizontal=True)
 
 uploaded_video = None
+frame_skip = 1
 if input_mode == "Upload Video":
     uploaded_video = st.file_uploader(
         "Upload a video file", type=["mp4", "avi", "mov", "mkv"])
     if uploaded_video:
         st.caption(f"File: **{uploaded_video.name}**")
+    frame_skip = st.select_slider(
+        "Process every N frames",
+        options=[1, 2, 4, 8, 16],
+        value=4,
+        help="Higher = faster processing with fewer data points. 4 is a good balance."
+    )
 
 _toggle_label = "Process Video" if input_mode == "Upload Video" else "Start Stream"
 _toggle_disabled = (input_mode == "Upload Video" and uploaded_video is None)
@@ -455,12 +462,19 @@ elif run and input_mode == "Upload Video":
     confs_b: List[float] = []
     progress_bar = st.progress(0, text="Processing frames…")
     frame_idx = 0
+    processed = 0
 
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
+
+            frame_idx += 1
+            if frame_idx % frame_skip != 0:
+                pct = min(frame_idx / max(total_frames, 1), 1.0)
+                progress_bar.progress(pct, text=f"Scanning… {frame_idx} / {total_frames}")
+                continue
 
             _, jpeg = cv2.imencode(".jpg", frame,
                                    [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
@@ -469,7 +483,7 @@ elif run and input_mode == "Upload Video":
 
             raw    = ws_conn.recv()
             result = json.loads(raw)
-            frame_idx += 1
+            processed += 1
 
             if "error" in result:
                 continue
@@ -477,10 +491,10 @@ elif run and input_mode == "Upload Video":
             _update_ui(frame, result, lats_a, lats_b, confs_a, confs_b)
 
             pct = min(frame_idx / max(total_frames, 1), 1.0)
-            progress_bar.progress(pct, text=f"Frame {frame_idx} / {total_frames}")
+            progress_bar.progress(pct, text=f"Frame {frame_idx} / {total_frames} — {processed} processed")
 
-        progress_bar.progress(1.0, text="Done — all frames processed.")
-        st.success(f"Processed **{frame_idx} frames** from **{uploaded_video.name}**.")
+        progress_bar.progress(1.0, text="Done.")
+        st.success(f"Processed **{processed} frames** (1 of every {frame_skip}) from **{uploaded_video.name}**.")
 
         # ── Final summary metrics ──────────────────────────────────────────
         if lats_a:
@@ -492,7 +506,7 @@ elif run and input_mode == "Upload Video":
             avg_saving = avg_lat_b - avg_lat_a
 
             sm1, sm2, sm3, sm4, sm5, sm6 = st.columns(6)
-            sm1.metric("Total Frames",         frame_idx)
+            sm1.metric("Frames Processed",     processed)
             sm2.metric("Avg Adaptive Latency", f"{avg_lat_a:.1f} ms")
             sm3.metric("Avg Baseline Latency", f"{avg_lat_b:.1f} ms")
             sm4.metric("Avg Latency Savings",  f"{avg_saving:.1f} ms",
