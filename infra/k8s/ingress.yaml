@@ -19,10 +19,11 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     # Allow large base64 JPEG frames
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-    # WebSocket upgrade passthrough
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header Upgrade $http_upgrade;
-      proxy_set_header Connection "Upgrade";
+    # Force HTTP/1.1 upstream (required for WebSocket upgrade)
+    # Do NOT add configuration-snippet for Upgrade/Connection — the NGINX
+    # ingress controller already adds them via its built-in WebSocket support.
+    # Adding them again in a snippet doubles the header and breaks the handshake.
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
 spec:
   rules:
     - http:
