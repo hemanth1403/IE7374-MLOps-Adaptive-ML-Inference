@@ -3,14 +3,15 @@ ui.py — Streamlit dashboard for the Adaptive ML Inference System.
 
 Two camera modes (controlled by CAMERA_MODE env var):
   - "local"   (default): OpenCV continuous live stream from webcam index 0
-  - "browser": st.camera_input — browser webcam, works on deployed GKE
+  - "browser": streamlit-webrtc — true live stream via browser camera (WebRTC),
+               works on deployed GKE without a physical webcam on the server
 
 Usage (from RL root directory)
 -----
     # Local live stream (default)
     streamlit run serving/ui.py
 
-    # Deployed / browser camera
+    # Deployed / browser camera (requires: pip install streamlit-webrtc aiortc av)
     CAMERA_MODE=browser streamlit run serving/ui.py
 """
 
@@ -71,10 +72,9 @@ def _to_rgb(frame):
     return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Session state (used only in browser mode)
+# Session state
 # ──────────────────────────────────────────────────────────────────────────────
 for _k, _v in [
-    ("ws_conn", None), ("frame_count", 0),
     ("adaptive_lats", []), ("baseline_lats", []),
     ("adaptive_confs", []), ("baseline_confs", []),
 ]:
@@ -125,8 +125,9 @@ with cr:
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Shared: update metrics and charts from a result dict
+# update_left=False skips feed_l (used in browser mode where WebRTC shows it)
 # ──────────────────────────────────────────────────────────────────────────────
-def _update_ui(frame, result, lats_a, lats_b, confs_a, confs_b):
+def _update_ui(frame, result, lats_a, lats_b, confs_a, confs_b, update_left=True):
     adp = result["adaptive"]
     bsl = result["baseline"]
 
@@ -136,7 +137,8 @@ def _update_ui(frame, result, lats_a, lats_b, confs_a, confs_b):
     bf = _overlay_hud(_draw_boxes(frame, bsl["detections"], BASELINE_COLOR),
                       bsl["model_name"], bsl["latency_ms"], bsl["avg_confidence"], False)
 
-    feed_l.image(_to_rgb(af), channels="RGB", use_container_width=True)
+    if update_left:
+        feed_l.image(_to_rgb(af), channels="RGB", use_container_width=True)
     feed_r.image(_to_rgb(bf), channels="RGB", use_container_width=True)
 
     ph_model_l.metric("Model", adp["model_name"])
@@ -230,60 +232,135 @@ if run and CAMERA_MODE == "local":
         ws_conn.close()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# MODE B — Browser: st.camera_input (for GKE / deployed environments)
+# MODE B — Browser: streamlit-webrtc (true live stream for GKE / deployed)
+#
+# The browser camera is accessed via WebRTC — no server-side webcam needed.
+# Each frame is sent to the FastAPI backend via WebSocket; the annotated
+# adaptive frame is returned through the WebRTC stream. The baseline feed
+# and all metrics are updated via a 10 fps polling loop (st.rerun).
+#
+# Requires: pip install streamlit-webrtc aiortc av
+# HTTPS note: Chrome blocks getUserMedia on HTTP. Use Firefox, or access via
+#   kubectl port-forward svc/ui-service 8501:80 -n adaptive-inference
+#   then open http://localhost:8501
 # ══════════════════════════════════════════════════════════════════════════════
 elif run and CAMERA_MODE == "browser":
-    st.info("Click **Take Photo** — the stream will run continuously after the first capture.")
-    camera_frame = st.camera_input(
-        "Live Camera",
-        key=f"cam_{st.session_state.frame_count}",
-        label_visibility="collapsed",
-    )
+    try:
+        from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
+        import av as _av
+        import threading as _threading
+    except ImportError:
+        st.error(
+            "**streamlit-webrtc** is not installed. "
+            "Run: `pip install streamlit-webrtc aiortc av`"
+        )
+        st.stop()
 
-    if camera_frame is not None:
-        if st.session_state.ws_conn is None:
+    RTC_CONFIG = RTCConfiguration({
+        "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]},
+            {"urls": ["stun:stun1.l.google.com:19302"]},
+        ]
+    })
+
+    class _InferenceProcessor(VideoProcessorBase):
+        """Sends each WebRTC frame to the FastAPI backend; returns annotated frame."""
+
+        def __init__(self) -> None:
+            self._data_lock = _threading.Lock()  # guards _latest
+            self._ws_lock   = _threading.Lock()  # guards WebSocket from concurrent recv()
+            self._ws: Any   = None
+            self._latest: Any = None             # (raw_bgr_frame, result_dict) | None
+            self._baseline: str = baseline_choice
+            self._connect()
+
+        def _connect(self) -> None:
             try:
-                st.session_state.ws_conn = websocket.create_connection(WS_URL, timeout=5)
-            except Exception as exc:
-                st.error(f"Cannot connect to inference server at **{WS_URL}** — {exc}")
-                st.stop()
+                self._ws = websocket.create_connection(WS_URL, timeout=5)
+            except Exception:
+                self._ws = None
 
-        img_bytes = camera_frame.getvalue()
-        arr   = np.frombuffer(img_bytes, dtype=np.uint8)
-        frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        def recv(self, frame: "_av.VideoFrame") -> "_av.VideoFrame":
+            img = frame.to_ndarray(format="bgr24")
+            with self._ws_lock:
+                if self._ws is None:
+                    self._connect()
+                if self._ws:
+                    try:
+                        _, jpeg = cv2.imencode(
+                            ".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY]
+                        )
+                        b64 = base64.b64encode(jpeg.tobytes()).decode()
+                        self._ws.send(
+                            json.dumps({"frame": b64, "baseline_model": self._baseline})
+                        )
+                        result = json.loads(self._ws.recv())
+                        if "error" not in result:
+                            with self._data_lock:
+                                self._latest = (img.copy(), result)
+                            adp   = result["adaptive"]
+                            color = MODEL_COLORS.get(adp["model_name"], (200, 200, 200))
+                            out   = _overlay_hud(
+                                _draw_boxes(img, adp["detections"], color),
+                                adp["model_name"], adp["latency_ms"],
+                                adp["avg_confidence"], True,
+                            )
+                            return _av.VideoFrame.from_ndarray(_to_rgb(out), format="rgb24")
+                    except Exception:
+                        self._ws = None
+            return _av.VideoFrame.from_ndarray(img, format="bgr24")
 
-        if frame is not None:
-            _, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
-            b64 = base64.b64encode(jpeg.tobytes()).decode()
-            try:
-                st.session_state.ws_conn.send(
-                    json.dumps({"frame": b64, "baseline_model": baseline_choice}))
-                result = json.loads(st.session_state.ws_conn.recv())
-                if "error" not in result:
-                    _update_ui(frame, result,
-                               st.session_state.adaptive_lats,
-                               st.session_state.baseline_lats,
-                               st.session_state.adaptive_confs,
-                               st.session_state.baseline_confs)
-            except Exception as exc:
-                st.session_state.ws_conn = None
-                st.error(f"Connection lost — {exc}")
-                st.stop()
+        def get_latest(self) -> Any:
+            with self._data_lock:
+                return self._latest
 
-        st.session_state.frame_count += 1
-        time.sleep(0.05)
+        def __del__(self) -> None:
+            if self._ws:
+                try:
+                    self._ws.close()
+                except Exception:
+                    pass
+
+    # ── Launch WebRTC streamer in the left-column feed placeholder ─────────────
+    # feed_l.container() places the WebRTC player at the correct position
+    # (above the per-feed metric row) without extra empty space.
+    with feed_l.container():
+        ctx = webrtc_streamer(
+            key="inference",
+            video_processor_factory=_InferenceProcessor,
+            rtc_configuration=RTC_CONFIG,
+            media_stream_constraints={"video": True, "audio": False},
+        )
+
+    # Keep the baseline model selection in sync with the live processor
+    if ctx.video_processor:
+        ctx.video_processor._baseline = baseline_choice
+
+    # ── Poll processor for results; update baseline feed + all metrics ─────────
+    if ctx.state.playing and ctx.video_processor:
+        latest = ctx.video_processor.get_latest()
+        if latest is not None:
+            frame, result = latest
+            _update_ui(
+                frame, result,
+                st.session_state.adaptive_lats,
+                st.session_state.baseline_lats,
+                st.session_state.adaptive_confs,
+                st.session_state.baseline_confs,
+                update_left=False,   # WebRTC element already shows the adaptive feed
+            )
+        time.sleep(0.1)   # ~10 fps metrics refresh
         st.rerun()
 
-else:
-    # Stream stopped — clean up browser mode connection
-    if st.session_state.ws_conn is not None:
-        try:
-            st.session_state.ws_conn.close()
-        except Exception:
-            pass
-        st.session_state.ws_conn    = None
-        st.session_state.frame_count = 0
+    elif not ctx.state.playing:
         st.session_state.adaptive_lats  = []
         st.session_state.baseline_lats  = []
         st.session_state.adaptive_confs = []
         st.session_state.baseline_confs = []
+
+else:
+    # Stream stopped — reset metrics history
+    st.session_state.adaptive_lats  = []
+    st.session_state.baseline_lats  = []
+    st.session_state.adaptive_confs = []
+    st.session_state.baseline_confs = []

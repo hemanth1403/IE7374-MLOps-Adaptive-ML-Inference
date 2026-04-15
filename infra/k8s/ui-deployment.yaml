@@ -8,7 +8,7 @@ metadata:
   labels:
     app: ui
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: ui
@@ -43,6 +43,11 @@ spec:
                 configMapKeyRef:
                   name: adaptive-inference-config
                   key: WS_URL
+            - name: CAMERA_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: adaptive-inference-config
+                  key: CAMERA_MODE
 
           resources:
             requests:
