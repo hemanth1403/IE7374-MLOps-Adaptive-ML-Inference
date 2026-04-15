@@ -39,6 +39,9 @@ class SessionTracker:
 
     def __init__(self, experiment_name: str = "adaptive_inference") -> None:
         mlflow.set_experiment(experiment_name)
+        # End any stale run left over from a session that disconnected without finalizing
+        if mlflow.active_run() is not None:
+            mlflow.end_run()
         self._run = mlflow.start_run()
 
         self._adaptive_latencies: List[float] = []
@@ -67,39 +70,45 @@ class SessionTracker:
     def finalize(self) -> None:
         """
         Compute session summary, log to MLflow, and close the active run.
-        Safe to call even if no frames were recorded.
+        Safe to call even if no frames were recorded or if MLflow is unavailable.
         """
-        if self._frame_count == 0:
+        try:
+            if self._frame_count == 0:
+                mlflow.end_run()
+                return
+
+            n = self._frame_count
+            avg_adaptive = sum(self._adaptive_latencies) / n
+            avg_baseline = sum(self._baseline_latencies) / n
+            savings = avg_baseline - avg_adaptive
+
+            mlflow.log_metrics(
+                {
+                    "avg_adaptive_latency_ms": round(avg_adaptive, 2),
+                    "avg_baseline_latency_ms": round(avg_baseline, 2),
+                    "latency_savings_ms":      round(savings, 2),
+                    "total_frames":            n,
+                }
+            )
+
+            for model_name, count in self._model_counts.items():
+                pct = (count / n) * 100.0
+                mlflow.log_metric(f"model_pct_{model_name.lower()}", round(pct, 2))
+
+            mlflow.log_param("model_distribution", str(dict(self._model_counts)))
+
             mlflow.end_run()
-            return
 
-        n = self._frame_count
-        avg_adaptive = sum(self._adaptive_latencies) / n
-        avg_baseline = sum(self._baseline_latencies) / n
-        savings = avg_baseline - avg_adaptive
-
-        mlflow.log_metrics(
-            {
-                "avg_adaptive_latency_ms": round(avg_adaptive, 2),
-                "avg_baseline_latency_ms": round(avg_baseline, 2),
-                "latency_savings_ms":      round(savings, 2),
-                "total_frames":            n,
-            }
-        )
-
-        # Model selection distribution (as percentage of frames)
-        for model_name, count in self._model_counts.items():
-            pct = (count / n) * 100.0
-            mlflow.log_metric(f"model_pct_{model_name.lower()}", round(pct, 2))
-
-        mlflow.log_param("model_distribution", str(dict(self._model_counts)))
-
-        mlflow.end_run()
-
-        print(
-            f"[Tracking] Session complete — {n} frames | "
-            f"adaptive avg {avg_adaptive:.1f} ms | "
-            f"baseline avg {avg_baseline:.1f} ms | "
-            f"savings {savings:+.1f} ms | "
-            f"distribution {dict(self._model_counts)}"
-        )
+            print(
+                f"[Tracking] Session complete — {n} frames | "
+                f"adaptive avg {avg_adaptive:.1f} ms | "
+                f"baseline avg {avg_baseline:.1f} ms | "
+                f"savings {savings:+.1f} ms | "
+                f"distribution {dict(self._model_counts)}"
+            )
+        except Exception as exc:
+            print(f"[Tracking] MLflow logging failed (non-fatal): {exc}")
+            try:
+                mlflow.end_run()
+            except Exception:
+                pass
