@@ -25,6 +25,8 @@ metadata:
     # Adding them again in a snippet doubles the header and breaks the handshake.
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
 spec:
+  tls:
+    - secretName: adaptive-inference-tls
   rules:
     - http:
         paths:
