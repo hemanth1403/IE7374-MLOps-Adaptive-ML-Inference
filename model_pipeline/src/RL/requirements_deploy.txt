@@ -34,7 +34,5 @@ pandas==2.0.3
 prometheus-client==0.19.0
 python-json-logger==2.0.7
 
-# ── Browser live-stream (WebRTC camera, deployed mode) ────────────────────────
-streamlit-webrtc>=0.45.0
-aiortc>=1.6.0
-av>=10.0.0
+# ── Altair charts (already pulled by streamlit, pinned for reproducibility) ───
+altair>=4.0.0

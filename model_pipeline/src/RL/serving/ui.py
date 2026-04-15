@@ -3,15 +3,16 @@ ui.py — Streamlit dashboard for the Adaptive ML Inference System.
 
 Two camera modes (controlled by CAMERA_MODE env var):
   - "local"   (default): OpenCV continuous live stream from webcam index 0
-  - "browser": streamlit-webrtc — true live stream via browser camera (WebRTC),
-               works on deployed GKE without a physical webcam on the server
+  - "browser": Pure JavaScript getUserMedia + WebSocket — no WebRTC/STUN/TURN needed.
+               The browser captures the camera, sends JPEG frames directly to the
+               FastAPI backend via ws://<host>/ws/stream (routed by NGINX ingress).
 
 Usage (from RL root directory)
 -----
     # Local live stream (default)
     streamlit run serving/ui.py
 
-    # Deployed / browser camera (requires: pip install streamlit-webrtc aiortc av)
+    # Deployed / browser camera
     CAMERA_MODE=browser streamlit run serving/ui.py
 """
 
@@ -95,7 +96,10 @@ st.caption(
     "Path A uses the PPO RL agent to dynamically route frames to the optimal "
     f"YOLOv8 variant. Path B uses YOLOv8-{baseline_choice} as a fixed baseline.")
 
-# ── Layout placeholders ───────────────────────────────────────────────────────
+# ── Placeholder for browser camera component (full-width, sits above columns) ─
+browser_ph = st.empty()
+
+# ── Layout placeholders (used by local mode) ─────────────────────────────────
 col_l, col_r = st.columns(2)
 with col_l:
     st.subheader("Path A — RL Adaptive")
@@ -124,8 +128,8 @@ with cr:
     ph_conf_chart = st.empty()
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Shared: update metrics and charts from a result dict
-# update_left=False skips feed_l (used in browser mode where WebRTC shows it)
+# Shared: update metrics and charts (local mode)
+# update_left=False skips feed_l (browser mode handles adaptive display in JS)
 # ──────────────────────────────────────────────────────────────────────────────
 def _update_ui(frame, result, lats_a, lats_b, confs_a, confs_b, update_left=True):
     adp = result["adaptive"]
@@ -232,146 +236,182 @@ if run and CAMERA_MODE == "local":
         ws_conn.close()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# MODE B — Browser: streamlit-webrtc (true live stream for GKE / deployed)
+# MODE B — Browser: pure JavaScript camera + WebSocket (no WebRTC/STUN/TURN)
 #
-# The browser camera is accessed via WebRTC — no server-side webcam needed.
-# Each frame is sent to the FastAPI backend via WebSocket; the annotated
-# adaptive frame is returned through the WebRTC stream. The baseline feed
-# and all metrics are updated via a 10 fps polling loop (st.rerun).
+# The browser captures camera via getUserMedia(), draws frames to a canvas,
+# and sends base64 JPEG frames directly to the FastAPI backend WebSocket at
+# ws://<host>/ws/stream (routed via NGINX ingress — backend never exposed publicly).
 #
-# Requires: pip install streamlit-webrtc aiortc av
-# HTTPS note: Chrome blocks getUserMedia on HTTP. Use Firefox, or access via
-#   kubectl port-forward svc/ui-service 8501:80 -n adaptive-inference
-#   then open http://localhost:8501
+# No peer-to-peer connection needed, so no NAT issues. Works on any browser
+# that supports getUserMedia (all modern browsers over HTTPS; Firefox also on HTTP).
 # ══════════════════════════════════════════════════════════════════════════════
 elif run and CAMERA_MODE == "browser":
-    try:
-        from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
-        import av as _av
-        import threading as _threading
-    except ImportError:
-        st.error(
-            "**streamlit-webrtc** is not installed. "
-            "Run: `pip install streamlit-webrtc aiortc av`"
-        )
-        st.stop()
 
-    # STUN alone fails when GKE pods and browsers are both behind NAT.
-    # TURN relays the media through a server that both sides can reach.
-    # Replace username/credential with your own metered.ca credentials for production.
-    RTC_CONFIG = RTCConfiguration({
-        "iceServers": [
-            {"urls": ["stun:stun.l.google.com:19302"]},
-            {
-                "urls": [
-                    "turn:openrelay.metered.ca:80",
-                    "turn:openrelay.metered.ca:443",
-                    "turn:openrelay.metered.ca:443?transport=tcp",
-                    "turn:openrelay.metered.ca:80?transport=tcp",
-                ],
-                "username": "openrelayproject",
-                "credential": "openrelayproject",
-            },
-        ]
-    })
+    _component_html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ background: transparent; font-family: monospace; color: #eee; padding: 4px; }}
+  #status {{ font-size: 12px; color: #aaa; margin-bottom: 8px; }}
+  .feeds {{ display: flex; gap: 8px; width: 100%; }}
+  .feed-wrap {{ flex: 1; }}
+  .feed-label {{ font-size: 12px; color: #aaa; margin-bottom: 4px; }}
+  canvas {{ width: 100%; aspect-ratio: 4/3; display: block;
+            border-radius: 4px; background: #0e1117; }}
+  .metrics {{ display: flex; margin-top: 10px; border-top: 1px solid #333; }}
+  .metric {{ flex: 1; padding: 8px 4px; text-align: center;
+             border-right: 1px solid #333; }}
+  .metric:last-child {{ border-right: none; }}
+  .mval {{ font-size: 1.05em; font-weight: bold; color: #FF6B35; }}
+  .mlbl {{ font-size: 10px; color: #888; margin-top: 2px; }}
+</style>
+</head>
+<body>
+<div id="status">Starting camera...</div>
+<div class="feeds">
+  <div class="feed-wrap">
+    <div class="feed-label">Path A — RL Adaptive</div>
+    <canvas id="cA"></canvas>
+  </div>
+  <div class="feed-wrap">
+    <div class="feed-label">Path B — Baseline (YOLOv8-{baseline_choice})</div>
+    <canvas id="cB"></canvas>
+  </div>
+</div>
+<div class="metrics">
+  <div class="metric"><div class="mval" id="mModel">—</div><div class="mlbl">RL Model</div></div>
+  <div class="metric"><div class="mval" id="mLatA">—</div><div class="mlbl">Adaptive Latency</div></div>
+  <div class="metric"><div class="mval" id="mLatB">—</div><div class="mlbl">Baseline Latency</div></div>
+  <div class="metric"><div class="mval" id="mSave">—</div><div class="mlbl">Latency Saved</div></div>
+  <div class="metric"><div class="mval" id="mConfA">—</div><div class="mlbl">Adaptive Conf</div></div>
+  <div class="metric"><div class="mval" id="mConfB">—</div><div class="mlbl">Baseline Conf</div></div>
+</div>
+<video id="vid" autoplay playsinline muted style="display:none"></video>
 
-    class _InferenceProcessor(VideoProcessorBase):
-        """Sends each WebRTC frame to the FastAPI backend; returns annotated frame."""
+<script>
+const BASELINE = '{baseline_choice}';
+const FPS      = 10;
+const W = 640, H = 480;
+const MODEL_COLORS = {{Nano:'#00ff55', Small:'#00ffff', Large:'#4466ff'}};
+const BL_COLOR = '#ff9600';
 
-        def __init__(self) -> None:
-            self._data_lock = _threading.Lock()  # guards _latest
-            self._ws_lock   = _threading.Lock()  # guards WebSocket from concurrent recv()
-            self._ws: Any   = None
-            self._latest: Any = None             # (raw_bgr_frame, result_dict) | None
-            self._baseline: str = baseline_choice
-            self._connect()
+const vid = document.getElementById('vid');
+const cA  = document.getElementById('cA');
+const cB  = document.getElementById('cB');
+const xA  = cA.getContext('2d');
+const xB  = cB.getContext('2d');
+const status = document.getElementById('status');
 
-        def _connect(self) -> None:
-            try:
-                self._ws = websocket.create_connection(WS_URL, timeout=5)
-            except Exception:
-                self._ws = None
+cA.width = W; cA.height = H;
+cB.width = W; cB.height = H;
 
-        def recv(self, frame: "_av.VideoFrame") -> "_av.VideoFrame":
-            img = frame.to_ndarray(format="bgr24")
-            with self._ws_lock:
-                if self._ws is None:
-                    self._connect()
-                if self._ws:
-                    try:
-                        _, jpeg = cv2.imencode(
-                            ".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY]
-                        )
-                        b64 = base64.b64encode(jpeg.tobytes()).decode()
-                        self._ws.send(
-                            json.dumps({"frame": b64, "baseline_model": self._baseline})
-                        )
-                        result = json.loads(self._ws.recv())
-                        if "error" not in result:
-                            with self._data_lock:
-                                self._latest = (img.copy(), result)
-                            adp   = result["adaptive"]
-                            color = MODEL_COLORS.get(adp["model_name"], (200, 200, 200))
-                            out   = _overlay_hud(
-                                _draw_boxes(img, adp["detections"], color),
-                                adp["model_name"], adp["latency_ms"],
-                                adp["avg_confidence"], True,
-                            )
-                            return _av.VideoFrame.from_ndarray(_to_rgb(out), format="rgb24")
-                    except Exception:
-                        self._ws = None
-            return _av.VideoFrame.from_ndarray(img, format="bgr24")
+let ws = null;
+let lastResult = null;
 
-        def get_latest(self) -> Any:
-            with self._data_lock:
-                return self._latest
+async function init() {{
+  try {{
+    const stream = await navigator.mediaDevices.getUserMedia({{video:true, audio:false}});
+    vid.srcObject = stream;
+    await new Promise(r => vid.onloadedmetadata = r);
+    status.textContent = 'Camera ready — connecting to backend...';
+  }} catch(e) {{
+    status.textContent = 'Camera blocked: ' + e.message + ' (use HTTPS or Firefox)';
+    return;
+  }}
+  connect();
+  requestAnimationFrame(renderLoop);
+  setInterval(sendFrame, Math.round(1000 / FPS));
+}}
 
-        def __del__(self) -> None:
-            if self._ws:
-                try:
-                    self._ws.close()
-                except Exception:
-                    pass
+function connect() {{
+  const host  = (window.parent || window).location.host;
+  const proto = (window.parent || window).location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + host + '/ws/stream');
+  ws.onopen  = () => {{ status.textContent = 'Live \u2014 RL adaptive routing active \u2713'; }};
+  ws.onclose = () => {{ status.textContent = 'Reconnecting...'; setTimeout(connect, 2000); }};
+  ws.onerror = () => {{ status.textContent = 'Backend unreachable \u2014 retrying...'; }};
+  ws.onmessage = evt => {{
+    try {{
+      const d = JSON.parse(evt.data);
+      if (!d.error) {{ lastResult = d; updateMetrics(d); }}
+    }} catch(_) {{}}
+  }};
+}}
 
-    # ── Launch WebRTC streamer in the left-column feed placeholder ─────────────
-    # feed_l.container() places the WebRTC player at the correct position
-    # (above the per-feed metric row) without extra empty space.
-    with feed_l.container():
-        ctx = webrtc_streamer(
-            key="inference",
-            video_processor_factory=_InferenceProcessor,
-            rtc_configuration=RTC_CONFIG,
-            media_stream_constraints={"video": True, "audio": False},
-        )
+function sendFrame() {{
+  if (!ws || ws.readyState !== 1 || vid.readyState < 2) return;
+  const tmp = document.createElement('canvas');
+  tmp.width = W; tmp.height = H;
+  tmp.getContext('2d').drawImage(vid, 0, 0, W, H);
+  tmp.toBlob(blob => {{
+    const reader = new FileReader();
+    reader.onloadend = () => {{
+      if (ws.readyState !== 1) return;
+      const b64 = reader.result.split(',')[1];
+      ws.send(JSON.stringify({{frame: b64, baseline_model: BASELINE}}));
+    }};
+    reader.readAsDataURL(blob);
+  }}, 'image/jpeg', 0.75);
+}}
 
-    # Keep the baseline model selection in sync with the live processor
-    if ctx.video_processor:
-        ctx.video_processor._baseline = baseline_choice
+function renderLoop() {{
+  if (vid.readyState >= 2) {{
+    xA.drawImage(vid, 0, 0, W, H);
+    xB.drawImage(vid, 0, 0, W, H);
+    if (lastResult) {{
+      const adp = lastResult.adaptive;
+      const bsl = lastResult.baseline;
+      overlayResult(xA, adp.detections, MODEL_COLORS[adp.model_name] || '#ccc',
+                    'RL: ' + adp.model_name, adp.latency_ms, adp.avg_confidence);
+      overlayResult(xB, bsl.detections, BL_COLOR,
+                    'Baseline: ' + bsl.model_name, bsl.latency_ms, bsl.avg_confidence);
+    }}
+  }}
+  requestAnimationFrame(renderLoop);
+}}
 
-    # ── Poll processor for results; update baseline feed + all metrics ─────────
-    if ctx.state.playing and ctx.video_processor:
-        latest = ctx.video_processor.get_latest()
-        if latest is not None:
-            frame, result = latest
-            _update_ui(
-                frame, result,
-                st.session_state.adaptive_lats,
-                st.session_state.baseline_lats,
-                st.session_state.adaptive_confs,
-                st.session_state.baseline_confs,
-                update_left=False,   # WebRTC element already shows the adaptive feed
-            )
-        time.sleep(0.1)   # ~10 fps metrics refresh
-        st.rerun()
+function overlayResult(ctx, dets, color, label, lat, conf) {{
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, W, 52);
+  ctx.fillStyle = color;
+  ctx.font = 'bold 15px monospace';
+  ctx.fillText(label, 10, 24);
+  ctx.fillStyle = '#cccccc';
+  ctx.font = '11px monospace';
+  ctx.fillText(lat.toFixed(1) + ' ms  |  conf: ' + conf.toFixed(2), 10, 44);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.fillStyle = color;
+  ctx.font = '11px monospace';
+  (dets || []).forEach(d => {{
+    const [x1,y1,x2,y2] = d.bbox;
+    ctx.strokeRect(x1, y1, x2-x1, y2-y1);
+    ctx.fillText(d.class_name + ' ' + d.confidence.toFixed(2), x1, Math.max(y1-3,12));
+  }});
+}}
 
-    elif not ctx.state.playing:
-        st.session_state.adaptive_lats  = []
-        st.session_state.baseline_lats  = []
-        st.session_state.adaptive_confs = []
-        st.session_state.baseline_confs = []
+function updateMetrics(d) {{
+  const save = d.baseline.latency_ms - d.adaptive.latency_ms;
+  document.getElementById('mModel').textContent  = d.adaptive.model_name;
+  document.getElementById('mLatA').textContent   = d.adaptive.latency_ms.toFixed(1) + ' ms';
+  document.getElementById('mLatB').textContent   = d.baseline.latency_ms.toFixed(1)  + ' ms';
+  document.getElementById('mSave').textContent   = save.toFixed(1) + ' ms';
+  document.getElementById('mConfA').textContent  = d.adaptive.avg_confidence.toFixed(2);
+  document.getElementById('mConfB').textContent  = d.baseline.avg_confidence.toFixed(2);
+}}
+
+init();
+</script>
+</body>
+</html>"""
+
+    with browser_ph.container():
+        st.components.v1.html(_component_html, height=580, scrolling=False)
 
 else:
-    # Stream stopped — reset metrics history
+    # Stream stopped — reset history
     st.session_state.adaptive_lats  = []
     st.session_state.baseline_lats  = []
     st.session_state.adaptive_confs = []

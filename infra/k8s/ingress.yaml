@@ -1,43 +1,49 @@
-# NGINX Ingress — routes external traffic to UI and backend.
-# Prerequisites:
-#   1. Install NGINX ingress controller:
-#        kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
-#   2. Install cert-manager for TLS:
-#        kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml
-#   3. Create a ClusterIssuer for Let's Encrypt (see cert-manager docs)
-#   4. Update 'host' fields below with your actual domain
+# NGINX Ingress — routes all external traffic through one IP.
 #
-# WebSocket upgrade is handled via nginx.ingress.kubernetes.io/proxy-read-timeout
-# and the upgrade/connection annotations below.
----
+# Prerequisites (run once on the cluster):
+#   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+#   kubectl get svc -n ingress-nginx ingress-nginx-controller --watch   # wait for EXTERNAL-IP
+#
+# After the ingress IP is assigned, users access the app at that IP (not the old UI LoadBalancer IP).
+# The /ws/ path routes browser WebSocket frames directly to the backend — no WebRTC needed.
+#
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: adaptive-inference-ingress
   namespace: adaptive-inference
   annotations:
-    # Use NGINX ingress class
     kubernetes.io/ingress.class: nginx
-    # TLS certificate managed by cert-manager
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    # Increase timeouts for WebSocket long-lived connections
+    # Long timeouts for persistent WebSocket connections
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    # WebSocket upgrade headers
-    nginx.ingress.kubernetes.io/proxy-set-headers: "adaptive-inference/websocket-headers"
-    # Larger body for base64 JPEG frames
+    # Allow large base64 JPEG frames
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    # WebSocket upgrade passthrough
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "Upgrade";
 spec:
-  tls:
-    - hosts:
-        - adaptive.yourdomain.com        # <-- replace with your domain
-        - api.adaptive.yourdomain.com    # <-- replace with your domain
-      secretName: adaptive-inference-tls
   rules:
-    # Dashboard UI
-    - host: adaptive.yourdomain.com      # <-- replace with your domain
-      http:
+    - http:
         paths:
+          # Browser camera WebSocket — frames go direct to backend (bypasses Streamlit)
+          - path: /ws/
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 8000
+          # Backend REST / health / metrics
+          - path: /api/
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 8000
+          # Streamlit UI — catch-all
           - path: /
             pathType: Prefix
             backend:
@@ -45,24 +51,3 @@ spec:
                 name: ui-service
                 port:
                   number: 80
-    # FastAPI backend (inference API + WebSocket)
-    - host: api.adaptive.yourdomain.com  # <-- replace with your domain
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: backend-service
-                port:
-                  number: 8000
----
-# ConfigMap with WebSocket upgrade headers for NGINX
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: websocket-headers
-  namespace: adaptive-inference
-data:
-  Upgrade: "$http_upgrade"
-  Connection: "Upgrade"
