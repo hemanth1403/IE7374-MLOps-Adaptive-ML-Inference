@@ -228,7 +228,7 @@ def _update_ui(frame, result, lats_a, lats_b, confs_a, confs_b, update_left=True
 # ══════════════════════════════════════════════════════════════════════════════
 if run and input_mode == "Live Camera" and CAMERA_MODE == "local":
     try:
-        ws_conn = websocket.create_connection(WS_URL, timeout=5)
+        ws_conn = websocket.create_connection(WS_URL, timeout=30)
     except Exception as exc:
         st.error(f"Cannot connect to inference server at **{WS_URL}** — {exc}")
         st.stop()
@@ -457,7 +457,7 @@ elif run and input_mode == "Upload Video":
     st.caption(f"Video info: **{total_frames} frames** @ **{fps:.1f} fps**")
 
     try:
-        ws_conn = websocket.create_connection(WS_URL, timeout=5)
+        ws_conn = websocket.create_connection(WS_URL, timeout=30)
     except Exception as exc:
         cap.release()
         os.unlink(tmp.name)
