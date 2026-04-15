@@ -126,11 +126,17 @@ class AdaptiveInferenceSystem:
     @staticmethod
     def _load_yolo(path: str, device: str):
         """Prefer .onnx over .pt for faster CPU inference (deployed only).
+        Checks alongside the .pt file and in /app/models/ (deployed PVC path).
         Returns (YOLO model, is_onnx). ONNX models skip .to(device)."""
-        onnx_path = os.path.splitext(path)[0] + ".onnx"
-        if os.path.exists(onnx_path):
-            print(f"[Engine] Using ONNX: {onnx_path}")
-            return YOLO(onnx_path), True
+        base = os.path.splitext(os.path.basename(path))[0]
+        candidates = [
+            os.path.splitext(path)[0] + ".onnx",   # sibling of .pt (local)
+            f"/app/models/{base}.onnx",             # deployed PVC path
+        ]
+        for onnx_path in candidates:
+            if os.path.exists(onnx_path):
+                print(f"[Engine] Using ONNX: {onnx_path}")
+                return YOLO(onnx_path), True
         print(f"[Engine] Using PyTorch: {path}")
         return YOLO(path).to(device), False
 
