@@ -1,239 +1,224 @@
 # Model Pipeline
 
-This module contains the complete **model evaluation, benchmarking, comparison, bias-analysis, and experiment-tracking workflow** for the adaptive ML inference project.
+This module contains the complete **model evaluation, benchmarking, RL agent training, and production serving stack** for the adaptive ML inference project.
 
-The pipeline uses **pre-trained YOLOv8 variants** (`nano`, `small`, and `large`) and evaluates their tradeoffs across:
-
-- detection quality,
-- inference latency,
-- throughput,
-- workload-slice behavior,
-- reproducibility,
-- and deployment suitability.
-
-These outputs support **final model selection** and the broader **adaptive routing / orchestration** design used in the project.
+The pipeline evaluates three pre-trained YOLOv8 variants (nano, small, large), trains a PPO reinforcement learning agent to route frames between them, and serves the result via a FastAPI + Streamlit stack deployed on GKE.
 
 ---
 
-# 1. Scope and purpose
+## 1. Scope and Purpose
 
 The goal of this pipeline is to answer:
 
 - Which pre-trained YOLO model gives the best detection quality?
 - Which model gives the best latency and throughput?
 - How do these tradeoffs change across simple, moderate, and complex scenes?
-- What evidence supports choosing one fixed model versus an adaptive routing strategy?
+- Can an RL agent learn to route frames better than a fixed model?
 
-This project does **not** train a brand-new detector architecture from scratch. Instead, it uses **pre-trained YOLOv8 nano, small, and large** models and focuses on:
+This project does **not** train a new detector architecture from scratch. It uses **pre-trained YOLOv8 nano, small, and large** models and focuses on:
 
-- validation,
-- runtime benchmarking,
-- model comparison,
-- slice-based analysis,
+- validation and benchmarking,
+- model comparison and slice-based analysis,
 - bias/disparity reporting,
-- experiment tracking with MLflow,
-- and CI-based reproducibility.
+- RL environment design and PPO agent training,
+- production serving via FastAPI WebSocket + Streamlit dashboard,
+- MLflow experiment tracking,
+- Kubernetes deployment.
 
 ---
 
-# 2. Models evaluated
+## 2. Models Evaluated
 
-The current pipeline evaluates the following pre-trained YOLOv8 variants:
-
-- **YOLO Nano (`yolov8n.pt`)**  
-  Lowest-latency / highest-throughput tier.
-
-- **YOLO Small (`yolov8s.pt`)**  
-  Balanced middle tier.
-
-- **YOLO Large (`yolov8l.pt`)**  
-  Highest-capacity / highest-latency tier.
+| Model | Latency | mAP@0.5 | Use case |
+|---|---|---|---|
+| `yolov8n.pt` — YOLO Nano | ~8ms | 40% | Simple scenes |
+| `yolov8s.pt` — YOLO Small | ~15ms | 46% | Balanced baseline |
+| `yolov8l.pt` — YOLO Large | ~48ms | 53% | Complex scenes |
 
 ---
 
-# 3. Repository structure
+## 3. Repository Structure
 
-```text
-model_pipeline/
-├── artifacts/
-│   └── dataset.yaml
-├── configs/
-│   ├── data/
-│   │   └── dataset_config.yaml
-│   ├── eval/
-│   │   └── eval_config.yaml
-│   └── train/
-│       └── train_config.yaml
-├── reports/
-│   ├── benchmarks/
-│   ├── bias/
-│   ├── figures/
-│   └── metrics/
-├── src/
-│   ├── RL/
-│   ├── bias/
-│   │   └── generate_bias_report.py
-│   └── evaluation/
-│       ├── benchmark.py
-│       ├── compare_models.py
-│       ├── evaluate.py
-│       └── generate_slice_comparison.py
-└── tests/
 ```
+model_pipeline/
+├── configs/
+│   ├── data/dataset_config.yaml       # Dataset paths for evaluation
+│   ├── eval/eval_config.yaml          # Evaluation metrics and benchmark settings
+│   ├── train/train_config.yaml        # Model variants and checkpoint config
+│   └── tracking/mlflow_config.yaml    # MLflow experiment settings
+│
+├── artifacts/
+│   └── dataset.yaml                   # Dataset metadata for YOLO evaluation
+│
+├── reports/
+│   ├── benchmarks/                    # Per-model runtime benchmark outputs
+│   ├── bias/                          # Slice-based bias/disparity reports
+│   ├── figures/                       # Comparison plots
+│   └── metrics/                       # Per-model evaluation outputs
+│
+├── src/
+│   ├── evaluation/
+│   │   ├── evaluate.py                # YOLO validation (mAP, precision, recall)
+│   │   ├── benchmark.py               # Latency and throughput profiling
+│   │   ├── compare_models.py          # Cross-model comparison report
+│   │   └── generate_slice_comparison.py
+│   │
+│   ├── bias/
+│   │   └── generate_bias_report.py    # Slice-based disparity analysis
+│   │
+│   └── RL/                            # RL agent + production serving stack
+│       ├── core/
+│       │   ├── environment.py         # Gymnasium env (1028-dim obs, 3 actions)
+│       │   ├── features.py            # FeatureExtractor (32×32 grayscale + edge)
+│       │   ├── agent.py               # PPO/DQN policy setup
+│       │   ├── reward_functions.py    # Multi-objective reward computation
+│       │   └── buffer_manager.py      # Experience replay buffer
+│       │
+│       ├── serving/
+│       │   ├── engine.py              # AdaptiveInferenceSystem (dual-path infer)
+│       │   ├── app.py                 # FastAPI + WebSocket endpoint
+│       │   ├── ui.py                  # Streamlit dashboard
+│       │   └── tracking.py            # MLflow session tracker
+│       │
+│       ├── training/
+│       │   ├── train_rl.py            # Main PPO training loop
+│       │   ├── pretrain_bc.py         # Behavioral Cloning warm-start
+│       │   └── profile_models.py      # Generates model_performance_profile.csv
+│       │
+│       ├── tests/
+│       │   ├── test_rl.py             # Environment smoke tests
+│       │   └── test_policy.py         # Policy rollout tests
+│       │
+│       ├── models/                    # Trained PPO weights (PPO_v6/final_adaptive_model)
+│       ├── Dockerfile                 # Production image (nvidia/cuda:12.1.0)
+│       ├── requirements_deploy.txt    # Serving dependencies
+│       ├── export_onnx.py             # One-time ONNX export for all three YOLOs
+│       └── README.md                  # Full RL + serving documentation
+│
+└── requirements.txt
+```
+
 ---
 
-# 4. Directory Overview
+## 4. Running the Evaluation Pipeline
 
-artifacts/
+```bash
+# Install dependencies
+pip install -r model_pipeline/requirements.txt
 
-Contains dataset metadata used during evaluation.
+# Profile models (generates model_performance_profile.csv for RL training)
+python model_pipeline/src/RL/training/profile_models.py
 
-configs/
+# Evaluate models
+python model_pipeline/src/evaluation/evaluate.py
 
-Contains configuration files for:
+# Benchmark latency and throughput
+python model_pipeline/src/evaluation/benchmark.py
 
-dataset paths,
-evaluation settings,
-benchmark settings,
-model definitions.
-reports/metrics/
+# Generate comparison report
+python model_pipeline/src/evaluation/compare_models.py
 
-Stores per-model evaluation outputs.
+# Generate bias report
+python model_pipeline/src/bias/generate_bias_report.py
+```
 
-reports/benchmarks/
-
-Stores per-model runtime benchmark outputs.
-
-reports/figures/
-
-Stores final comparison and slice-comparison outputs.
-
-reports/bias/
-
-Stores slice-based bias / disparity analysis outputs.
-
-src/evaluation/
-
-Contains the main evaluation, benchmark, comparison, and slice-report scripts.
-
-src/bias/
-
-Contains the script that generates bias/disparity reports from slice comparison outputs.
-
-src/RL/
-
-Contains the adaptive routing / RL logic used by the larger system.
 ---
 
-# 7. Configuration Files Used
-model_pipeline/configs/eval/eval_config.yaml
+## 5. RL Agent Training
 
-Controls:
+The RL agent learns to route frames to the optimal YOLO variant. Training uses Behavioral Cloning as a warm-start before PPO fine-tuning (prevents policy collapse).
 
-evaluation split,
-benchmark device,
-output directories.
-model_pipeline/configs/train/train_config.yaml
+```bash
+cd model_pipeline/src/RL
 
-Defines:
+# Step 1 — profile models to get latency/accuracy data
+python training/profile_models.py
 
-model variants,
-fallback pretrained YOLO weights,
-checkpoint output structure.
-model_pipeline/configs/data/dataset_config.yaml
+# Step 2 — warm-start with Behavioral Cloning
+python training/pretrain_bc.py
 
-Used by benchmarking logic to locate split files and processed dataset resources.
+# Step 3 — PPO fine-tuning
+python training/train_rl.py
 
-model_pipeline/artifacts/dataset.yaml
+# Test trained policy
+python tests/test_policy.py
+```
 
-Base dataset metadata used to generate dataset.runtime.yaml
+See [src/RL/README.md](src/RL/README.md) for full RL documentation including observation space design, reward function details, and training history.
 
-# 8. MLflow Experiment Tracking
+---
 
-This pipeline logs experiments to MLflow.
+## 6. Serving Stack
 
-Start the MLflow UI
+The trained agent is served via FastAPI + Streamlit:
+
+```bash
+cd model_pipeline/src/RL
+
+# Backend (port 8000)
+python -m uvicorn serving.app:app --host 0.0.0.0 --port 8000
+
+# Dashboard (port 8501)
+streamlit run serving/ui.py
+```
+
+Dashboard features:
+- **Live camera** mode (HTTPS required for browser camera access)
+- **Video upload** mode with frame-skip slider (1/2/4/8/16× speedup)
+- **Dual video feeds** — RL-adaptive (Path A) vs YOLOv8-Small baseline (Path B)
+- **Live metrics** — latency, confidence, model selection distribution
+
+For production deployment on Kubernetes, see [infra/README.md](../infra/README.md).
+
+---
+
+## 7. Configuration Files
+
+| File | Controls |
+|---|---|
+| `configs/eval/eval_config.yaml` | Evaluation split, benchmark device, output directories |
+| `configs/train/train_config.yaml` | Model variants, pretrained weights, checkpoint paths |
+| `configs/data/dataset_config.yaml` | Dataset paths and split files |
+| `configs/tracking/mlflow_config.yaml` | MLflow experiment names and registry settings |
+
+---
+
+## 8. MLflow Tracking
+
+```bash
 mlflow ui
+# Open http://127.0.0.1:5000
+```
 
-Then open:
+**Experiments logged:**
+- `pretrained_yolo_evaluation` — mAP50, mAP50-95, precision, recall
+- `pretrained_yolo_benchmark` — latency, throughput per workload bucket
+- `pretrained_yolo_summary` — cross-model comparison
 
-http://127.0.0.1:5000
-Current Experiments:
+**RL sessions** are logged automatically when a WebSocket client disconnects (see `serving/tracking.py`).
 
-pretrained_yolo_evaluation
-pretrained_yolo_benchmark
-pretrained_yolo_summary
+---
 
-What Is Logged:
+## 9. ONNX Export (deployed inference)
 
-Evaluation Runs
-model name
-weight source
-split
-device
-mAP50
-mAP50_95
-precision
-recall
-metrics JSON artifact
-Benchmark Runs
-model name
-weight source
-split name
-overall latency
-overall throughput
-per-bucket latency
-per-bucket throughput
-benchmark JSON artifact
+The engine automatically uses ONNX models when available — they're 2-3× faster on CPU than PyTorch `.pt` files. To export:
 
-# 9. CI/CD Reproducibility
+```bash
+cd model_pipeline/src/RL
+python export_onnx.py
+# Produces yolov8n.onnx, yolov8s.onnx, yolov8l.onnx
+```
 
-The repository includes a GitHub Actions workflow for the model pipeline.
+In deployment, ONNX files are stored on a PVC at `/app/models/`. The engine checks that path automatically — no code change needed.
 
-The CI workflow currently does the following:
+---
 
-checks out the repository,
-sets up Python,
-installs model-pipeline dependencies,
-authenticates to GCP using a GitHub secret,
-uses DVC to pull only the evaluation data needed for CI,
-runs pretrained evaluation,
-regenerates comparison and bias reports,
-uploads report artifacts.
-Current CI Behavior
+## 10. Model Selection Conclusion
 
-The workflow pulls only the evaluation data needed for CI instead of restoring the full data pipeline workspace.
+Based on benchmarking results:
 
-This keeps CI focused on model-evaluation reproducibility rather than full pipeline reconstruction.
+- **YOLO Nano** — fastest, best for simple low-clutter scenes
+- **YOLO Small** — best balance of speed and accuracy, strongest fixed baseline
+- **YOLO Large** — highest accuracy, but 3× slower and more expensive
 
-# 10. Current Model-Selection Conclusion
-
-Based on the current outputs:
-
-YOLO Nano is the fastest model and is the best option when low latency and high throughput matter most.
-YOLO Small provides the best balance between detection quality and runtime cost and is the strongest default baseline.
-YOLO Large gives the strongest detection quality but is substantially slower and more expensive to run.
-
-These results support an adaptive routing strategy rather than always using one fixed model tier.
-
-# 11. Current Model-Selection Conclusion
-
-Based on the current outputs:
-
-YOLO Nano is the fastest model and is the best option when low latency and high throughput matter most.
-YOLO Small provides the best balance between detection quality and runtime cost and is the strongest default baseline.
-YOLO Large gives the strongest detection quality but is substantially slower and more expensive to run.
-
-These results support an adaptive routing strategy rather than always using one fixed model tier.
-
-# 12. Summary
-
-This model pipeline provides a complete pre-trained model evaluation workflow for adaptive inference:
-
-evaluates YOLO Nano, Small, and Large,
-benchmarks them across workload slices,
-compares their tradeoffs,
-generates slice-based comparison artifacts,
-generates bias/disparity reports,
-tracks experiments in MLflow,
-and supports reproducible CI evaluation using DVC-backed data access.
+These results confirm that no single model is optimal across all scene types, which motivates the adaptive RL routing strategy.
