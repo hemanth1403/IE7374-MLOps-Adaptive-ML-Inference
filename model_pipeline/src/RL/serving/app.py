@@ -48,9 +48,11 @@ _RL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _RL_ROOT not in sys.path:
     sys.path.insert(0, _RL_ROOT)
 
+import asyncio
 import base64
 import json
 from contextlib import asynccontextmanager
+from functools import partial
 from typing import Any, Dict
 
 import cv2
@@ -267,7 +269,10 @@ async def stream(websocket: WebSocket) -> None:
                 await websocket.send_text(_error("Could not decode frame"))
                 continue
 
-            result = _engine.infer(frame, baseline_model_name=baseline_model_name)
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None, partial(_engine.infer, frame, baseline_model_name=baseline_model_name)
+            )
             tracker.record(result)
 
             # Update Prometheus metrics

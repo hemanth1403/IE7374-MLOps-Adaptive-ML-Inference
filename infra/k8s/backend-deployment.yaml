@@ -74,6 +74,7 @@ spec:
               port: 8000
             initialDelaySeconds: 0
             periodSeconds: 5
+            timeoutSeconds: 5
             failureThreshold: 120
 
           # Readiness probe: gates traffic; fails during SIGTERM drain
@@ -82,7 +83,8 @@ spec:
               path: /health/ready
               port: 8000
             periodSeconds: 5
-            failureThreshold: 2
+            timeoutSeconds: 5
+            failureThreshold: 3
             successThreshold: 1
 
           # Liveness probe: restarts pod if engine becomes unresponsive
@@ -92,7 +94,8 @@ spec:
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 10
-            failureThreshold: 3
+            timeoutSeconds: 10
+            failureThreshold: 5
 
       volumes:
         - name: model-weights
