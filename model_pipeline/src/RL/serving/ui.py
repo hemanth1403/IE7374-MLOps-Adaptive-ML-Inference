@@ -164,8 +164,8 @@ def _update_ui(frame, result, lats_a, lats_b, confs_a, confs_b, update_left=True
                       bsl["model_name"], bsl["latency_ms"], bsl["avg_confidence"], False)
 
     if update_left:
-        feed_l.image(_to_rgb(af), channels="RGB", use_column_width=True)
-    feed_r.image(_to_rgb(bf), channels="RGB", use_column_width=True)
+        feed_l.image(_to_rgb(af), channels="RGB", use_container_width=True)
+    feed_r.image(_to_rgb(bf), channels="RGB", use_container_width=True)
 
     ph_model_l.metric("Model", adp["model_name"])
     ph_count_l.metric("Objects", adp["object_count"])
