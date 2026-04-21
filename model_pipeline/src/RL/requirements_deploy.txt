@@ -27,8 +27,9 @@ onnxruntime>=1.16.0
 # Docker image uses Python 3.10 — no 3.8 constraint; 1.35+ adds use_container_width to st.image()
 streamlit==1.38.0
 
-# ── MLOps tracking ────────────────────────────────────────────────────────────
+# ── MLOps tracking & drift detection ─────────────────────────────────────────
 mlflow==2.9.2
+evidently==0.4.16
 
 # ── Data ──────────────────────────────────────────────────────────────────────
 numpy==1.24.4

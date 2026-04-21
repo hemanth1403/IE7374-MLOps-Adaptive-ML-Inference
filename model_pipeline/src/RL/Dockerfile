@@ -65,6 +65,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # at runtime rather than baking into the image layer.
 COPY core/ ./core/
 COPY serving/ ./serving/
+COPY monitoring/ ./monitoring/
 
 # ── Non-root user (principle of least privilege) ──────────────────────────────
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
