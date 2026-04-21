@@ -113,6 +113,7 @@ IE7374-MLOps-Adaptive-ML-Inference/
 │   │       ├── core/                  # environment.py, features.py, agent.py
 │   │       ├── serving/               # FastAPI app, Streamlit UI, engine, tracking
 │   │       ├── training/              # train_rl.py, pretrain_bc.py, profile_models.py
+│   │       ├── monitoring/            # drift_detector.py, retrain_trigger.py
 │   │       ├── tests/                 # RL policy & environment tests
 │   │       ├── models/                # Trained PPO weights (PPO_v6/)
 │   │       ├── Dockerfile             # Production container (CUDA 12.1)
@@ -121,9 +122,9 @@ IE7374-MLOps-Adaptive-ML-Inference/
 │   └── README.md
 │
 ├── infra/                             # Checkpoint 4 — Complete
-│   ├── k8s/                           # 13 Kubernetes manifests
+│   ├── k8s/                           # 14 Kubernetes manifests (incl. drift CronJob)
 │   ├── docker/                        # docker-compose.prod.yaml
-│   ├── monitoring/                    # Prometheus + Grafana configs
+│   ├── monitoring/                    # Prometheus + Grafana + alert rules
 │   └── README.md
 │
 ├── services/                          # Planned microservice scaffolding
@@ -174,10 +175,13 @@ IE7374-MLOps-Adaptive-ML-Inference/
 - Kubernetes manifests for all services (backend, UI, MLflow, monitoring)
 - Production Docker image with CUDA 12.1
 - ONNX-optimised YOLO models for CPU inference
-- Prometheus metrics + Grafana dashboards
+- Prometheus metrics + Grafana dashboards with alerting rules
 - HTTPS ingress with TLS, HPA autoscaling
-- GitHub Actions CI/CD pipeline
-- **Status: Completed & Live on GKE** — see [DEPLOYMENT_INTERNAL.md](DEPLOYMENT_INTERNAL.md)
+- GitHub Actions CI/CD pipeline (6 workflows)
+- Evidently AI drift detection — K8s CronJob runs every 6 hours
+- Automated retraining pipeline triggered on drift or performance decay
+- Slack notifications for retraining events
+- **Status: Completed & Live on GKE** — see [infra/README.md](infra/README.md)
 
 ---
 
@@ -277,7 +281,18 @@ cd Data-Pipeline && pytest tests/ -v --cov=scripts
 cd model_pipeline/src/RL && python -m pytest tests/ -v
 ```
 
-GitHub Actions runs data pipeline tests on every push. See `.github/workflows/ci.yml`.
+GitHub Actions runs data pipeline tests on every push.
+
+### CI/CD Workflows
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| `ci.yml` | Push / PR | Data pipeline lint + pytest |
+| `rl-ci.yml` | Push / PR | RL environment unit tests + DVC dry-run |
+| `model-pipeline-ci.yml` | Push / PR | Model evaluation + bias reports |
+| `rl-docker.yml` | Push to `model_pipeline/src/RL/**` | Build & push Docker image to GHCR |
+| `deploy-gke.yml` | After Docker build succeeds | Rolling deploy to GKE (all K8s manifests) |
+| `retrain.yml` | `repository_dispatch` or manual | DVC retrain → quality gate → build → GKE deploy |
 
 ---
 
@@ -300,7 +315,7 @@ GitHub Actions runs data pipeline tests on every push. See `.github/workflows/ci
 |---|---|
 | [Data-Pipeline/README.md](Data-Pipeline/README.md) | Airflow + DVC pipeline guide |
 | [model_pipeline/src/RL/README.md](model_pipeline/src/RL/README.md) | RL agent training + serving stack |
-| [infra/README.md](infra/README.md) | Docker + Kubernetes deployment |
+| [infra/README.md](infra/README.md) | Docker + Kubernetes + drift detection + retraining |
 | [DEPLOYMENT_INTERNAL.md](DEPLOYMENT_INTERNAL.md) | Full GKE production deployment guide |
 | [docs/project_scoping_document.pdf](docs/project_scoping_document.pdf) | Checkpoint 1 scoping |
 

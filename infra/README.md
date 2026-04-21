@@ -8,24 +8,29 @@ Production deployment infrastructure for the Adaptive ML Inference platform. Sup
 
 ```
 infra/
-├── k8s/                           # Kubernetes manifests (GKE)
-│   ├── namespace.yaml             # adaptive-inference namespace
-│   ├── configmap.yaml             # Environment variables (model paths, MLflow URI)
-│   ├── pvc.yaml                   # PersistentVolumeClaim for model weights
-│   ├── backend-deployment.yaml    # FastAPI inference server
-│   ├── ui-deployment.yaml         # Streamlit dashboard
-│   ├── mlflow-deployment.yaml     # MLflow tracking server
-│   ├── prometheus-deployment.yaml # Prometheus metrics
-│   ├── grafana-deployment.yaml    # Grafana dashboards
-│   ├── ingress.yaml               # NGINX ingress with TLS + WebSocket support
-│   └── hpa.yaml                   # Horizontal Pod Autoscaler
+├── k8s/                               # Kubernetes manifests (GKE)
+│   ├── namespace.yaml                 # adaptive-inference namespace
+│   ├── configmap.yaml                 # Environment variables (model paths, MLflow URI)
+│   ├── pvc.yaml                       # PersistentVolumeClaim for model weights
+│   ├── backend-deployment.yaml        # FastAPI inference server
+│   ├── ui-deployment.yaml             # Streamlit dashboard
+│   ├── mlflow-deployment.yaml         # MLflow tracking server
+│   ├── backend-service.yaml           # ClusterIP for FastAPI
+│   ├── ui-service.yaml                # ClusterIP for Streamlit
+│   ├── mlflow-service.yaml            # ClusterIP for MLflow
+│   ├── ingress.yaml                   # NGINX ingress with TLS + WebSocket support
+│   ├── hpa.yaml                       # Horizontal Pod Autoscaler (UI only)
+│   └── drift-detector-cronjob.yaml    # CronJob — runs drift detector every 6 hours
 │
 ├── docker/
-│   └── docker-compose.prod.yaml   # Full stack on a single GPU node
+│   └── docker-compose.prod.yaml       # Full stack on a single GPU node
 │
 └── monitoring/
-    ├── prometheus-configmap.yaml   # Prometheus scrape config
-    └── grafana-dashboard.json      # Pre-built inference metrics dashboard
+    ├── prometheus-configmap.yaml       # Prometheus scrape config + rule_files ref
+    ├── prometheus-deployment.yaml      # Prometheus v2.48.0 with 7-day retention
+    ├── prometheus-rules.yaml           # Alerting rules (latency, drift, routing)
+    ├── grafana-deployment.yaml         # Grafana v10.2.0
+    └── grafana-dashboard.json          # Pre-built inference metrics dashboard
 ```
 
 ---
@@ -143,3 +148,65 @@ Pre-built dashboard (`monitoring/grafana-dashboard.json`) shows:
 Import the dashboard: Grafana → Dashboards → Import → upload `grafana-dashboard.json`.
 
 Default credentials: `admin / admin` (change on first login).
+
+### Prometheus Alert Rules
+
+`monitoring/prometheus-rules.yaml` defines four alerting rules loaded automatically by Prometheus:
+
+| Alert | Condition | Severity |
+|---|---|---|
+| `HighAdaptiveLatencyP99` | p99 adaptive latency > 500ms for 5 min | warning |
+| `HighBaselineLatencyP99` | p99 baseline latency > 1s for 5 min | warning |
+| `LowFrameThroughput` | Frame rate < 0.01 fps for 10 min | info |
+| `HighWebSocketConnectionCount` | > 20 concurrent connections for 2 min | warning |
+| `ModelRoutingImbalance` | RL routes > 85% frames to Large for 30 min | warning |
+
+---
+
+## Drift Detection & Automated Retraining
+
+### How it works
+
+1. `infra/k8s/drift-detector-cronjob.yaml` runs every 6 hours as a K8s CronJob
+2. It executes `monitoring/drift_detector.py` inside the same Docker image
+3. The script pulls recent session metrics from MLflow and checks:
+   - Threshold violations (latency > 150ms, savings < 5ms, confidence < 0.30)
+   - Distribution drift via Evidently AI (compares recent vs. reference sessions)
+4. If drift is detected, `monitoring/retrain_trigger.py` fires a GitHub `repository_dispatch` event
+5. This starts the `retrain.yml` GitHub Actions workflow which:
+   - Retrains the model with `dvc repro`
+   - Runs the quality gate (`pct_nano >= 20%`, `pct_large >= 20%`)
+   - Builds a new Docker image and does a rolling update on GKE
+   - Sends Slack notifications at start, success, and failure
+
+### Required secrets
+
+Create the `retraining-secrets` K8s Secret before deploying the CronJob:
+
+```bash
+kubectl create secret generic retraining-secrets \
+  --from-literal=github-token=<GitHub PAT with repo scope> \
+  --from-literal=slack-webhook-url=<Slack incoming webhook URL> \
+  -n adaptive-inference
+```
+
+`slack-webhook-url` is optional — leave it empty if Slack notifications are not needed.
+
+### Required GitHub Actions secrets
+
+| Secret | Purpose |
+|---|---|
+| `GKE_SA_KEY` | GCP service account JSON for GKE authentication |
+| `GCP_SA_KEY_JSON` | Same SA JSON for DVC GCS remote access in `retrain.yml` |
+
+### Tuning drift thresholds
+
+Thresholds are set as environment variables in `drift-detector-cronjob.yaml` and can be changed without rebuilding the image:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LATENCY_THRESHOLD_MS` | 150 | Max acceptable avg adaptive latency |
+| `SAVINGS_THRESHOLD_MS` | 5 | Min latency savings vs baseline |
+| `CONFIDENCE_THRESHOLD` | 0.30 | Min average detection confidence |
+| `DRIFT_THRESHOLD` | 0.3 | Evidently drift score to trigger retrain |
+| `MIN_SESSIONS` | 10 | Min sessions before drift checks run |

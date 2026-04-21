@@ -80,6 +80,10 @@ RL/
 │   ├── ui.py                      # Streamlit dashboard — dual video + latency chart
 │   └── tracking.py                # SessionTracker — logs MLflow summary on disconnect
 │
+├── monitoring/                    # Production monitoring & automated retraining
+│   ├── drift_detector.py          # Detects perf decay / distribution drift via Evidently AI
+│   └── retrain_trigger.py         # Triggers retrain.yml via GitHub repository_dispatch + Slack
+│
 ├── training/                      # Training scripts
 │   ├── profile_models.py          # Benchmarks YOLO n/s/l on the dataset → CSV
 │   ├── train_rl.py                # Pure PPO training (produces collapsed policy)
@@ -1002,3 +1006,63 @@ in the downsampled grayscale features.
 | Adaptive latency higher than baseline | Expected if agent picks Large frequently; `decision_interval=5` amortises RL overhead |
 | CUDA out of memory | `INFERENCE_DEVICE=cpu python -m uvicorn serving.app:app --port 8000` |
 | Device mismatch: `Expected all tensors on same device` | Load PPO with `device='cpu'`: `PPO.load(path, device='cpu')` |
+
+---
+
+## 11. Monitoring & Drift Detection
+
+### How the monitoring pipeline works
+
+After deployment, a Kubernetes CronJob (`infra/k8s/drift-detector-cronjob.yaml`) runs `monitoring/drift_detector.py` every 6 hours. It:
+
+1. Pulls all finished MLflow sessions from the `adaptive_inference` experiment
+2. Runs **threshold checks** on the most recent 20 sessions:
+   - `avg_adaptive_latency_ms` > 150ms
+   - `latency_savings_ms` < 5ms
+   - `avg_adaptive_confidence` < 0.30
+3. Runs an **Evidently AI DataDrift report** comparing recent vs. reference sessions across all metric distributions
+4. Writes an HTML + JSON report to `/tmp/drift-reports/`
+5. If drift is detected → calls `monitoring/retrain_trigger.py` which fires a GitHub `repository_dispatch` event → starts `retrain.yml`
+
+### Running the drift detector locally
+
+```bash
+# Port-forward MLflow first
+kubectl port-forward svc/mlflow-service 5000:5000 -n adaptive-inference &
+
+# Run detector (dry-run, no trigger)
+cd model_pipeline/src/RL
+MLFLOW_TRACKING_URI=http://localhost:5000 python monitoring/drift_detector.py
+
+# Run with auto-trigger on drift
+MLFLOW_TRACKING_URI=http://localhost:5000 \
+GITHUB_TOKEN=<your-pat> \
+SLACK_WEBHOOK_URL=<optional> \
+python monitoring/drift_detector.py --trigger-on-drift --report-dir /tmp/drift-reports
+```
+
+### Environment variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `MLFLOW_TRACKING_URI` | Yes | `http://localhost:5000` | MLflow server URL |
+| `GITHUB_TOKEN` | For auto-trigger | — | PAT with `repo` scope |
+| `GITHUB_REPO` | No | `hemanth1403/IE7374-...` | Target repo for dispatch |
+| `SLACK_WEBHOOK_URL` | No | — | Incoming webhook for notifications |
+| `LATENCY_THRESHOLD_MS` | No | 150 | Max acceptable avg latency |
+| `SAVINGS_THRESHOLD_MS` | No | 5 | Min RL latency savings vs baseline |
+| `CONFIDENCE_THRESHOLD` | No | 0.30 | Min detection confidence |
+| `DRIFT_THRESHOLD` | No | 0.3 | Evidently drift score to trigger retrain |
+
+### What gets logged to MLflow per session
+
+`serving/tracking.py` logs these metrics after each WebSocket session:
+
+| Metric | Description |
+|---|---|
+| `avg_adaptive_latency_ms` | Mean RL-selected model latency |
+| `avg_baseline_latency_ms` | Mean YOLOv8-Small baseline latency |
+| `latency_savings_ms` | Baseline minus adaptive (positive = faster) |
+| `total_frames` | Frames processed in the session |
+| `model_pct_nano/small/large` | % of frames routed to each model |
+| `avg_adaptive_confidence` | Mean detection confidence (drift signal) |
