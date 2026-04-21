@@ -1,0 +1,89 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drift-detector
+  namespace: adaptive-inference
+  labels:
+    app: drift-detector
+spec:
+  # Run every 6 hours
+  schedule: "0 */6 * * *"
+  # Prevent overlapping runs (e.g. if a prior job is still running)
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      # No retries — if drift is detected the script exits 1 intentionally
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: drift-detector
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: drift-detector
+              image: ghcr.io/hemanth1403/ie7374-mlops-adaptive-ml-inference/adaptive-inference:latest
+              imagePullPolicy: Always
+              workingDir: /app
+              command:
+                - python
+                - monitoring/drift_detector.py
+                - --trigger-on-drift
+                - --report-dir
+                - /tmp/drift-reports
+              env:
+                - name: MLFLOW_TRACKING_URI
+                  valueFrom:
+                    configMapKeyRef:
+                      name: adaptive-inference-config
+                      key: MLFLOW_TRACKING_URI
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: retraining-secrets
+                      key: github-token
+                - name: GITHUB_REPO
+                  value: "hemanth1403/IE7374-MLOps-Adaptive-ML-Inference"
+                - name: SLACK_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: retraining-secrets
+                      key: slack-webhook-url
+                      optional: true
+                # Drift / decay thresholds (tune without rebuilding image)
+                - name: LATENCY_THRESHOLD_MS
+                  value: "150"
+                - name: SAVINGS_THRESHOLD_MS
+                  value: "5"
+                - name: CONFIDENCE_THRESHOLD
+                  value: "0.30"
+                - name: DRIFT_THRESHOLD
+                  value: "0.3"
+                - name: MIN_SESSIONS
+                  value: "10"
+              resources:
+                requests:
+                  cpu: "200m"
+                  memory: "512Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "1Gi"
+---
+# Secret template — populate with: kubectl create secret generic retraining-secrets \
+#   --from-literal=github-token=<PAT> \
+#   --from-literal=slack-webhook-url=<URL> \
+#   -n adaptive-inference
+#
+# This manifest is a reminder only; secrets are never committed to the repo.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: retraining-secrets
+  namespace: adaptive-inference
+  annotations:
+    # Managed externally — do not apply this stub if the real secret already exists
+    helm.sh/resource-policy: keep
+type: Opaque
+data: {}

@@ -92,6 +92,7 @@ jobs:
       - name: Apply monitoring stack
         run: |
           kubectl apply -f infra/monitoring/prometheus-configmap.yaml
+          kubectl apply -f infra/monitoring/prometheus-rules.yaml
           kubectl apply -f infra/monitoring/prometheus-deployment.yaml
           kubectl apply -f infra/monitoring/grafana-deployment.yaml
           # Load Grafana dashboard JSON into ConfigMap
@@ -121,6 +122,10 @@ jobs:
             infra/k8s/ui-deployment.yaml | kubectl apply -f -
           kubectl apply -f infra/k8s/ui-service.yaml
           kubectl apply -f infra/k8s/hpa.yaml
+
+      # ── Deploy drift detector CronJob ────────────────────────────────────────
+      - name: Apply drift detector CronJob
+        run: kubectl apply -f infra/k8s/drift-detector-cronjob.yaml
 
       # ── Apply ingress ─────────────────────────────────────────────────────────
       - name: Apply ingress

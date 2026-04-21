@@ -47,3 +47,30 @@ yolov8s.pt
 yolov8l.pt
 *.pt
 runs/
+
+Deployment_pipeline.pdf
+
+CLAUDE.md
+
+# GCP service account keys — never commit
+*.json
+!package.json
+!infra/monitoring/grafana-dashboard.json
+!model_pipeline/reports/**/*.json
+!model_pipeline/src/RL/metrics.json
+
+# MLflow run data — tracked by MLflow server, not git
+model_pipeline/src/RL/mlruns/
+
+# ONNX exported models — large binaries
+model_pipeline/src/RL/*.onnx
+model_pipeline/src/RL/*.onnx.data
+
+# Test images
+model_pipeline/src/RL/test_images/
+
+# Demo recordings
+Demo/
+
+# Misc
+expo_questions.tex

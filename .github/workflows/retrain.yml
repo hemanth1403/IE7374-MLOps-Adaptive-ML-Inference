@@ -1,0 +1,194 @@
+name: Automated Model Retraining
+
+# Triggered by the drift detector (repository_dispatch) or manually.
+on:
+  repository_dispatch:
+    types: [retrain-triggered]
+
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual retraining"
+        required: false
+        default: "Manual trigger"
+
+env:
+  GCP_PROJECT_ID: adaptive-ml-inference
+  GKE_CLUSTER:    adaptive-inference-cluster
+  GKE_ZONE:       europe-west1-b
+  NAMESPACE:      adaptive-inference
+  IMAGE:          ghcr.io/hemanth1403/ie7374-mlops-adaptive-ml-inference/adaptive-inference
+
+jobs:
+  retrain-and-deploy:
+    name: Retrain model and redeploy to GKE
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+      id-token: write   # required for Workload Identity Federation
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Notify start ──────────────────────────────────────────────────────
+      - name: Notify Slack — pipeline started
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          REASON="${{ github.event.client_payload.reason || github.event.inputs.reason || 'Scheduled retraining' }}"
+          SCORE="${{ github.event.client_payload.drift_score || 'N/A' }}"
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\": \":arrows_counterclockwise: *Retraining pipeline started*\n*Reason:* ${REASON}\n*Drift score:* ${SCORE}\n*Triggered by:* ${{ github.actor }}\"}"
+
+      # ── Python + DVC setup ────────────────────────────────────────────────
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install --quiet dvc[gcs] mlflow evidently
+          pip install --quiet -r model_pipeline/requirements.txt
+
+      # ── GCP authentication ────────────────────────────────────────────────
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GKE_SA_KEY }}
+
+      - name: Configure DVC remote credentials
+        run: |
+          mkdir -p Data-Pipeline/keys
+          echo '${{ secrets.GCP_SA_KEY_JSON }}' > Data-Pipeline/keys/rl_orchestration.json
+          cd model_pipeline/src/RL
+          dvc remote modify myremote credentialpath \
+            ../../../Data-Pipeline/keys/rl_orchestration.json
+
+      - name: Pull DVC cache (model weights + profiling data)
+        working-directory: model_pipeline/src/RL
+        run: dvc pull --run-cache || true
+
+      # ── Retraining ────────────────────────────────────────────────────────
+      - name: Run DVC retraining pipeline (train + evaluate)
+        working-directory: model_pipeline/src/RL
+        run: dvc repro --force train evaluate
+
+      # ── Quality gate ──────────────────────────────────────────────────────
+      - name: Check evaluation metrics
+        id: metrics
+        working-directory: model_pipeline/src/RL
+        run: |
+          python - <<'PYEOF'
+          import json, os, sys
+
+          with open("metrics.json") as f:
+              m = json.load(f)
+
+          avg_reward = m.get("avg_reward", 0.0)
+          pct_nano   = m.get("pct_nano",   0.0)
+          pct_large  = m.get("pct_large",  0.0)
+
+          # Mirror the quality gate in evaluate_policy.py
+          passed = pct_nano >= 20 and pct_large >= 20
+
+          print(f"avg_reward={avg_reward}  pct_nano={pct_nano}%  pct_large={pct_large}%  passed={passed}")
+
+          gh_out = os.environ.get("GITHUB_OUTPUT", "")
+          if gh_out:
+              with open(gh_out, "a") as f:
+                  f.write(f"passed={'true' if passed else 'false'}\n")
+                  f.write(f"avg_reward={avg_reward}\n")
+
+          if not passed:
+              print("::error::New model failed quality gate — aborting deployment")
+              sys.exit(1)
+          PYEOF
+
+      # ── Push retrained artifacts ──────────────────────────────────────────
+      - name: Push updated model artifacts to DVC remote
+        working-directory: model_pipeline/src/RL
+        run: dvc push
+
+      # ── Build new Docker image ────────────────────────────────────────────
+      - name: Free disk space for Docker build
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: docker
+        uses: docker/build-push-action@v5
+        with:
+          context: model_pipeline/src/RL
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:retrained-${{ github.run_number }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── GKE rolling update ────────────────────────────────────────────────
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location:     ${{ env.GKE_ZONE }}
+          project_id:   ${{ env.GCP_PROJECT_ID }}
+
+      - name: Rolling update backend with retrained image
+        run: |
+          TAG="retrained-${{ github.run_number }}"
+          sed "s|${{ env.IMAGE }}:latest|${{ env.IMAGE }}:${TAG}|g" \
+            infra/k8s/backend-deployment.yaml | kubectl apply -f -
+          kubectl rollout status deployment/backend \
+            -n ${{ env.NAMESPACE }} --timeout=600s
+
+      # ── Smoke test ────────────────────────────────────────────────────────
+      - name: Health check after redeployment
+        run: |
+          kubectl port-forward svc/backend-service 8000:8000 \
+            -n ${{ env.NAMESPACE }} &
+          sleep 5
+          curl -f http://localhost:8000/health/ready || \
+            (echo "Post-retrain health check FAILED" && exit 1)
+          echo "Backend is healthy after retraining"
+
+      # ── Notify outcome ────────────────────────────────────────────────────
+      - name: Notify Slack — success
+        if: success() && ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\": \":white_check_mark: *Retraining completed and deployed*\nImage tag: \`retrained-${{ github.run_number }}\`\nAvg reward: ${{ steps.metrics.outputs.avg_reward }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
+
+      - name: Notify Slack — failure
+        if: failure() && ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\": \":x: *Retraining pipeline FAILED*\nCheck: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
+
+      # ── Cleanup credentials ───────────────────────────────────────────────
+      - name: Remove GCP credentials
+        if: always()
+        run: rm -f Data-Pipeline/keys/rl_orchestration.json

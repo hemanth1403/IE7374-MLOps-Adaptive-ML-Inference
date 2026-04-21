@@ -46,6 +46,7 @@ class SessionTracker:
 
         self._adaptive_latencies: List[float] = []
         self._baseline_latencies: List[float] = []
+        self._adaptive_confidences: List[float] = []
         self._model_counts: Dict[str, int] = defaultdict(int)
         self._frame_count: int = 0
 
@@ -66,6 +67,9 @@ class SessionTracker:
         self._adaptive_latencies.append(result["adaptive"]["latency_ms"])
         self._baseline_latencies.append(result["baseline"]["latency_ms"])
         self._model_counts[result["adaptive"]["model_name"]] += 1
+        conf = result["adaptive"].get("avg_confidence")
+        if conf is not None:
+            self._adaptive_confidences.append(float(conf))
 
     def finalize(self) -> None:
         """
@@ -82,14 +86,17 @@ class SessionTracker:
             avg_baseline = sum(self._baseline_latencies) / n
             savings = avg_baseline - avg_adaptive
 
-            mlflow.log_metrics(
-                {
-                    "avg_adaptive_latency_ms": round(avg_adaptive, 2),
-                    "avg_baseline_latency_ms": round(avg_baseline, 2),
-                    "latency_savings_ms":      round(savings, 2),
-                    "total_frames":            n,
-                }
-            )
+            metrics_payload: Dict[str, float] = {
+                "avg_adaptive_latency_ms": round(avg_adaptive, 2),
+                "avg_baseline_latency_ms": round(avg_baseline, 2),
+                "latency_savings_ms":      round(savings, 2),
+                "total_frames":            n,
+            }
+            if self._adaptive_confidences:
+                avg_conf = sum(self._adaptive_confidences) / len(self._adaptive_confidences)
+                metrics_payload["avg_adaptive_confidence"] = round(avg_conf, 4)
+
+            mlflow.log_metrics(metrics_payload)
 
             for model_name, count in self._model_counts.items():
                 pct = (count / n) * 100.0

@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: adaptive-inference
+  labels:
+    app: prometheus
+data:
+  adaptive_inference_rules.yaml: |
+    groups:
+      - name: adaptive_inference_performance
+        interval: 30s
+        rules:
+
+          # ── Latency alerts ──────────────────────────────────────────────────
+
+          # p99 adaptive latency above 500 ms for 5 min → model routing may be degrading
+          - alert: HighAdaptiveLatencyP99
+            expr: |
+              histogram_quantile(0.99,
+                rate(adaptive_inference_adaptive_latency_seconds_bucket[5m])
+              ) > 0.5
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Adaptive inference p99 latency above 500 ms"
+              description: >
+                p99 adaptive latency is {{ $value | humanizeDuration }}
+                (threshold: 500 ms). RL routing may be selecting oversized models.
+
+          # p99 baseline latency above 1 s for 5 min → YOLO-Small degraded
+          - alert: HighBaselineLatencyP99
+            expr: |
+              histogram_quantile(0.99,
+                rate(adaptive_inference_baseline_latency_seconds_bucket[5m])
+              ) > 1.0
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Baseline (YOLO-Small) p99 latency above 1 s"
+              description: >
+                p99 baseline latency is {{ $value | humanizeDuration }}.
+                Check host GPU/CPU resources.
+
+          # ── Throughput alerts ───────────────────────────────────────────────
+
+          # Frame rate below 0.01 fps for 10 min → system likely idle or stuck
+          - alert: LowFrameThroughput
+            expr: rate(adaptive_inference_frames_total[10m]) < 0.01
+            for: 10m
+            labels:
+              severity: info
+            annotations:
+              summary: "Very low frame throughput detected"
+              description: >
+                Frame processing rate is {{ $value | humanize }} fps.
+                System may be idle or the WebSocket pipeline may be stalled.
+
+          # ── Connection alerts ───────────────────────────────────────────────
+
+          # More than 20 concurrent WebSocket connections for 2 min → capacity risk
+          - alert: HighWebSocketConnectionCount
+            expr: adaptive_inference_active_websocket_connections > 20
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High number of concurrent WebSocket connections"
+              description: >
+                {{ $value }} concurrent WebSocket connections (threshold: 20).
+                Consider scaling up the backend deployment.
+
+          # ── RL routing health alerts ────────────────────────────────────────
+
+          # RL agent routing > 85 % of frames to Large for 30 min → possible
+          # input distribution shift; agent may need retraining
+          - alert: ModelRoutingImbalance
+            expr: |
+              (
+                rate(adaptive_inference_model_selections_total{model="Large"}[30m])
+                /
+                ignoring(model) group_left
+                sum without(model)(rate(adaptive_inference_model_selections_total[30m]))
+              ) > 0.85
+            for: 30m
+            labels:
+              severity: warning
+            annotations:
+              summary: "RL agent routing >85% of frames to Large YOLO model"
+              description: >
+                {{ $value | humanizePercentage }} of frames are being routed to
+                the Large model. This may indicate input distribution shift or
+                RL policy collapse. Run drift_detector.py to confirm.
