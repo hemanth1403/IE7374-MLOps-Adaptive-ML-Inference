@@ -35,10 +35,10 @@ jobs:
 
       # ── Notify start ──────────────────────────────────────────────────────
       - name: Notify Slack — pipeline started
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
+          [ -z "$SLACK_WEBHOOK_URL" ] && exit 0
           REASON="${{ github.event.client_payload.reason || github.event.inputs.reason || 'Scheduled retraining' }}"
           SCORE="${{ github.event.client_payload.drift_score || 'N/A' }}"
           curl -s -X POST "$SLACK_WEBHOOK_URL" \
@@ -171,19 +171,21 @@ jobs:
 
       # ── Notify outcome ────────────────────────────────────────────────────
       - name: Notify Slack — success
-        if: success() && ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        if: success()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
+          [ -z "$SLACK_WEBHOOK_URL" ] && exit 0
           curl -s -X POST "$SLACK_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "{\"text\": \":white_check_mark: *Retraining completed and deployed*\nImage tag: \`retrained-${{ github.run_number }}\`\nAvg reward: ${{ steps.metrics.outputs.avg_reward }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
 
       - name: Notify Slack — failure
-        if: failure() && ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        if: failure()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
+          [ -z "$SLACK_WEBHOOK_URL" ] && exit 0
           curl -s -X POST "$SLACK_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "{\"text\": \":x: *Retraining pipeline FAILED*\nCheck: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
