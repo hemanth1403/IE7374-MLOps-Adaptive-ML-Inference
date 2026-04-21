@@ -127,14 +127,6 @@ IE7374-MLOps-Adaptive-ML-Inference/
 │   ├── monitoring/                    # Prometheus + Grafana + alert rules
 │   └── README.md
 │
-├── services/                          # Planned microservice scaffolding
-│   ├── orchestrator/
-│   ├── rl_policy_service/
-│   ├── yolo_nano_service/
-│   ├── yolo_small_service/
-│   ├── yolo_large_service/
-│   └── README.md
-│
 ├── shared/                            # Cross-service contracts
 │   ├── contracts/model_contract.md
 │   └── README.md
